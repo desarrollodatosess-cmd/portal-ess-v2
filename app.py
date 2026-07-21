@@ -1,5 +1,5 @@
-import datetime
 import calendar
+import datetime
 import pandas as pd
 import sqlalchemy
 import streamlit as st
@@ -95,7 +95,7 @@ st.markdown(
         font-size: 20px;
     }
 
-    /* Estilos especiales para la tarjeta doble (Tasa de Contratación) */
+    /* Estilos para la tarjeta doble (Tasa de Contratación) */
     .dual-value-container {
         display: flex;
         justify-content: space-between;
@@ -246,19 +246,18 @@ if pagina == "Dashboard":
       if plantilla_autorizada > 0
       else "0.00%"
   )
-  vacantes = max(0, plantilla_autorizada - plantilla_real)
 
   # ---------------------------------------------------------
   # CÁLCULO DE TASA DE CONTRATACIÓN (MES ACT. VS MES ANT.)
   # ---------------------------------------------------------
   hoy = datetime.date.today()
 
-  # Mes Actual (Fechas Inicio / Fin)
+  # Mes Actual
   inicio_mes_act = datetime.date(hoy.year, hoy.month, 1)
   dias_mes_act = calendar.monthrange(hoy.year, hoy.month)[1]
   fin_mes_act = datetime.date(hoy.year, hoy.month, dias_mes_act)
 
-  # Mes Anterior (Fechas Inicio / Fin)
+  # Mes Anterior
   primer_dia_mes_act = datetime.date(hoy.year, hoy.month, 1)
   fin_mes_ant = primer_dia_mes_act - datetime.timedelta(days=1)
   inicio_mes_ant = datetime.date(fin_mes_ant.year, fin_mes_ant.month, 1)
@@ -267,7 +266,6 @@ if pagina == "Dashboard":
   tasa_mes_ant_str = "--"
 
   if not df_operadores.empty:
-    # Aseguramos formato fecha
     df_operadores["FechaContratacion"] = pd.to_datetime(
         df_operadores["FechaContratacion"], errors="coerce"
     ).dt.date
@@ -275,7 +273,7 @@ if pagina == "Dashboard":
         df_operadores["FechaBaja"], errors="coerce"
     ).dt.date
 
-    # --- MES ACTUAL ---
+    # Mes Actual
     altas_act = df_operadores[
         (df_operadores["FechaContratacion"] >= inicio_mes_act)
         & (df_operadores["FechaContratacion"] <= fin_mes_act)
@@ -290,7 +288,7 @@ if pagina == "Dashboard":
       tasa_act = altas_act / bajas_act
       tasa_mes_act_str = f"{tasa_act * 100:.2f}%"
 
-    # --- MES ANTERIOR ---
+    # Mes Anterior
     altas_ant = df_operadores[
         (df_operadores["FechaContratacion"] >= inicio_mes_ant)
         & (df_operadores["FechaContratacion"] <= fin_mes_ant)
@@ -319,9 +317,9 @@ if pagina == "Dashboard":
   incapacitado_cnt = conteo_puestos.get("OPERADOR INCAPACITADO", 0)
 
   # ---------------------------------------------------------
-  # FILA 1: TARJETAS PRINCIPALES
+  # FILA 1: TARJETAS PRINCIPALES (AHORA EN 4 COLUMNAS)
   # ---------------------------------------------------------
-  col1, col2, col3, col4, col5 = st.columns(5)
+  col1, col2, col3, col4 = st.columns(4)
 
   with col1:
     st.markdown(
@@ -355,21 +353,6 @@ if pagina == "Dashboard":
 
   with col3:
     st.markdown(
-        f"""
-            <div class="kpi-card">
-                <div class="kpi-icon-badge">🎯</div>
-                <div>
-                    <div class="kpi-title">Vacantes</div>
-                    <div class="kpi-value" style="color: #2563EB;">{vacantes}</div>
-                </div>
-                <div class="kpi-sub">Por contratar</div>
-            </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-  with col4:
-    st.markdown(
         """
             <div class="kpi-card">
                 <div class="kpi-icon-badge">🔄</div>
@@ -383,7 +366,7 @@ if pagina == "Dashboard":
         unsafe_allow_html=True,
     )
 
-  with col5:
+  with col4:
     st.markdown(
         f"""
             <div class="kpi-card">
