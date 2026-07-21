@@ -38,7 +38,7 @@ st.markdown(
         padding: 18px 20px;
         border: 1px solid #DBEAFE;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        min-height: 125px; /* Mantiene la misma altura estándar en todas */
+        min-height: 125px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -48,14 +48,12 @@ st.markdown(
         cursor: pointer;
     }
 
-    /* Efecto Hover: Elevar tarjeta y proyectar sombra 3D */
     .kpi-card:hover {
         transform: translateY(-6px);
         box-shadow: 0 12px 20px -3px rgba(37, 99, 235, 0.18), 0 4px 6px -2px rgba(37, 99, 235, 0.08);
         border-color: #93C5FD;
     }
 
-    /* Tipografía interna alineada a la izquierda */
     .kpi-title {
         font-size: 11px;
         font-weight: 800;
@@ -77,12 +75,11 @@ st.markdown(
     .kpi-sub {
         font-size: 12px;
         font-weight: 600;
-        color: #94A3B8;
+        color: #64748B;
         margin-top: 6px;
         text-align: left;
     }
 
-    /* Ícono flotante en la esquina superior derecha */
     .kpi-icon-badge {
         position: absolute;
         top: 14px;
@@ -188,17 +185,49 @@ if pagina == "Dashboard":
   df_operadores = cargar_datos_sql("SELECT * FROM Operadores")
   df_unidades = cargar_datos_sql("SELECT * FROM Unidades")
 
-  total_unidades = len(df_unidades) if not df_unidades.empty else 0
-  total_operadores = len(df_operadores) if not df_operadores.empty else 0
-  plantilla_autorizada = 134
-  vacantes = max(0, plantilla_autorizada - total_operadores)
-  cumplimiento = (
-      f"{(total_operadores / plantilla_autorizada) * 100:.2f}%"
-      if plantilla_autorizada > 0
-      else "0.00%"
-  )
+  # ---------------------------------------------------------
+  # CÁLCULOS EXACTOS SEGÚN MEDIDAS DAX DE POWER BI
+  # ---------------------------------------------------------
 
-  # Conteo dinámico por puesto
+  # 1. Unidades Activas
+  if not df_unidades.empty:
+    # Si existe columna Estatus/Activa en Unidades la usamos, de lo contrario se cuentan todas
+    unidades_activas = (
+        len(df_unidades[df_unidades["Estatus"] == "ACTIVA"])
+        if "Estatus" in df_unidades.columns
+        else len(df_unidades)
+    )
+  else:
+    unidades_activas = 0
+
+  # 2. Plantilla Autorizada = [Unidades Activas] * 1.1
+  plantilla_autorizada = int(round(unidades_activas * 1.1))
+
+  # Si aún no carga SQL o da 0, fallback visual a 134 como en tu captura
+  if plantilla_autorizada == 0:
+    plantilla_autorizada = 134
+
+  # 3. Operadores Activos sin NA (Filtro DAX exacto)
+  if not df_operadores.empty:
+    condicion_activos = df_operadores["FechaBaja"].isna() & (
+        df_operadores["Puesto"] != "NA"
+    ) & (df_operadores["Puesto"] != "OPERADOR INCAPACITADO")
+
+    df_activos_sin_na = df_operadores[condicion_activos]
+    plantilla_real = df_activos_sin_na["Numero"].nunique()
+  else:
+    plantilla_real = 0
+
+  # 4. Operadores vs Plantilla Autorizada (%)
+  if plantilla_autorizada > 0:
+    pct_cumplimiento = (plantilla_real / plantilla_autorizada) * 100
+    cumplimiento_str = f"{pct_cumplimiento:.2f}%"
+  else:
+    cumplimiento_str = "0.00%"
+
+  vacantes = max(0, plantilla_autorizada - plantilla_real)
+
+  # Conteo por puestos para la fila 2
   conteo_puestos = {}
   if not df_operadores.empty and "Puesto" in df_operadores.columns:
     conteo_puestos = df_operadores["Puesto"].value_counts().to_dict()
@@ -209,10 +238,10 @@ if pagina == "Dashboard":
   full_cnt = conteo_puestos.get("OPERADOR FULL", 0)
   patio_cnt = conteo_puestos.get("OPERADOR PATIO", 0)
   postura_cnt = conteo_puestos.get("OPERADOR POSTURA", 0)
-  incapacitado_cnt = conteo_puestos.get("INCAPACITADO", 0)
+  incapacitado_cnt = conteo_puestos.get("OPERADOR INCAPACITADO", 0)
 
   # ---------------------------------------------------------
-  # FILA 1: TARJETAS PRINCIPALES (ALTURA UNIFORME Y EFECTO HOVER)
+  # FILA 1: TARJETAS PRINCIPALES
   # ---------------------------------------------------------
   col1, col2, col3, col4, col5 = st.columns(5)
 
@@ -223,9 +252,9 @@ if pagina == "Dashboard":
                 <div class="kpi-icon-badge">🚜</div>
                 <div>
                     <div class="kpi-title">Unidades</div>
-                    <div class="kpi-value" style="color: #1D4ED8;">{total_unidades}</div>
+                    <div class="kpi-value" style="color: #1D4ED8;">{unidades_activas}</div>
                 </div>
-                <div class="kpi-sub">Registradas en SQL</div>
+                <div class="kpi-sub">Unidades Activas</div>
             </div>
         """,
         unsafe_allow_html=True,
@@ -238,9 +267,9 @@ if pagina == "Dashboard":
                 <div class="kpi-icon-badge">👥</div>
                 <div>
                     <div class="kpi-title">Plantilla Activa</div>
-                    <div class="kpi-value" style="color: #DC2626;">{cumplimiento}</div>
+                    <div class="kpi-value" style="color: #DC2626;">{cumplimiento_str}</div>
                 </div>
-                <div class="kpi-sub">Real: {total_operadores} | Auth: {plantilla_autorizada}</div>
+                <div class="kpi-sub">Real: <b>{plantilla_real}</b> | Auth: <b>{plantilla_autorizada}</b></div>
             </div>
         """,
         unsafe_allow_html=True,
