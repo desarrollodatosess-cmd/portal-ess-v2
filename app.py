@@ -373,12 +373,21 @@ if pagina == "Dashboard":
       f"{(act_postura / meta_postura) * 100:.0f}%" if meta_postura > 0 else "0%"
   )
 
-  # OTROS PUESTOS (INCAPACITADOS)
-  conteo_puestos = {}
-  if not df_operadores.empty and "Puesto" in df_operadores.columns:
-    conteo_puestos = df_operadores["Puesto"].value_counts().to_dict()
+  # 5. OPERADOR INCAPACITADO
+  if not df_operadores.empty:
+    cond_incapacitado = (df_operadores["FechaBaja"].isna()) & (
+        df_operadores["Puesto"].astype(str).str.upper() == "OPERADOR INCAPACITADO"
+    )
+    act_incapacitado = df_operadores[cond_incapacitado]["Numero"].nunique()
+  else:
+    act_incapacitado = 0
 
-  incapacitado_cnt = conteo_puestos.get("OPERADOR INCAPACITADO", 0)
+  meta_incapacitado = 0
+  cump_incapacitado_str = (
+      f"{(act_incapacitado / meta_incapacitado) * 100:.0f}%"
+      if meta_incapacitado > 0
+      else "N/A"
+  )
 
   # ---------------------------------------------------------
   # FILA 1: TARJETAS PRINCIPALES
@@ -522,9 +531,9 @@ if pagina == "Dashboard":
                 <div class="kpi-icon-badge">🏥</div>
                 <div>
                     <div class="kpi-title">Incapacitados</div>
-                    <div class="kpi-value" style="color: #D97706;">{incapacitado_cnt}</div>
+                    <div class="kpi-value" style="color: #D97706;">{act_incapacitado}</div>
                 </div>
-                <div class="kpi-sub">Estatus médico</div>
+                <div class="kpi-sub">Meta: <b>{meta_incapacitado}</b> | <span style="color: #64748B; font-weight: 800;">{cump_incapacitado_str}</span></div>
             </div>
         """,
         unsafe_allow_html=True,
