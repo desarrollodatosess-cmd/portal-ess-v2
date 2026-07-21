@@ -94,31 +94,6 @@ st.markdown(
         justify-content: center;
         font-size: 20px;
     }
-
-    /* Estilos para la tarjeta doble (Tasa de Contratación) */
-    .dual-value-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        margin-top: 4px;
-    }
-
-    .dual-value-box {
-        text-align: left;
-    }
-
-    .dual-value-label {
-        font-size: 10px;
-        font-weight: 700;
-        color: #64748B;
-        text-transform: uppercase;
-    }
-
-    .dual-value-num {
-        font-size: 22px;
-        font-weight: 900;
-        color: #1D4ED8;
-    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -317,7 +292,7 @@ if pagina == "Dashboard":
   incapacitado_cnt = conteo_puestos.get("OPERADOR INCAPACITADO", 0)
 
   # ---------------------------------------------------------
-  # FILA 1: TARJETAS PRINCIPALES (AHORA EN 4 COLUMNAS)
+  # FILA 1: TARJETAS PRINCIPALES (ESTRUCTURA HOMOGÉNEA)
   # ---------------------------------------------------------
   col1, col2, col3, col4 = st.columns(4)
 
@@ -373,18 +348,9 @@ if pagina == "Dashboard":
                 <div class="kpi-icon-badge">📈</div>
                 <div>
                     <div class="kpi-title">Tasa de Contratación</div>
-                    <div class="dual-value-container">
-                        <div class="dual-value-box">
-                            <div class="dual-value-label">Mes Act.</div>
-                            <div class="dual-value-num" style="color: #4F46E5;">{tasa_mes_act_str}</div>
-                        </div>
-                        <div class="dual-value-box">
-                            <div class="dual-value-label">Mes Ant.</div>
-                            <div class="dual-value-num" style="color: #6366F1;">{tasa_mes_ant_str}</div>
-                        </div>
-                    </div>
+                    <div class="kpi-value" style="color: #1D4ED8;">{tasa_mes_act_str}</div>
                 </div>
-                <div class="kpi-sub">Altas / Bajas</div>
+                <div class="kpi-sub">Mes Ant: <b>{tasa_mes_ant_str}</b> | Altas / Bajas</div>
             </div>
         """,
         unsafe_allow_html=True,
