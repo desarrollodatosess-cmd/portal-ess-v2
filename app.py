@@ -373,7 +373,7 @@ if pagina == "Dashboard":
       f"{(act_postura / meta_postura) * 100:.0f}%" if meta_postura > 0 else "0%"
   )
 
-  # 5. OPERADOR INCAPACITADO
+  # 5. OPERADOR INCAPACITADO (CORREGIDO PARA CUMPLIMIENTO PORCENTUAL)
   if not df_operadores.empty:
     cond_incapacitado = (df_operadores["FechaBaja"].isna()) & (
         df_operadores["Puesto"].astype(str).str.upper() == "OPERADOR INCAPACITADO"
@@ -383,11 +383,12 @@ if pagina == "Dashboard":
     act_incapacitado = 0
 
   meta_incapacitado = 0
-  cump_incapacitado_str = (
-      f"{(act_incapacitado / meta_incapacitado) * 100:.0f}%"
-      if meta_incapacitado > 0
-      else "N/A"
-  )
+  if meta_incapacitado == 0:
+    cump_incapacitado_str = "100%" if act_incapacitado == 0 else "0%"
+  else:
+    cump_incapacitado_str = (
+        f"{(act_incapacitado / meta_incapacitado) * 100:.0f}%"
+    )
 
   # ---------------------------------------------------------
   # FILA 1: TARJETAS PRINCIPALES
@@ -525,6 +526,9 @@ if pagina == "Dashboard":
     )
 
   with p5:
+    color_cump_incapacitado = (
+        "#059669" if act_incapacitado == 0 else "#DC2626"
+    )
     st.markdown(
         f"""
             <div class="kpi-card">
@@ -533,7 +537,7 @@ if pagina == "Dashboard":
                     <div class="kpi-title">Incapacitados</div>
                     <div class="kpi-value" style="color: #D97706;">{act_incapacitado}</div>
                 </div>
-                <div class="kpi-sub">Meta: <b>{meta_incapacitado}</b> | <span style="color: #64748B; font-weight: 800;">{cump_incapacitado_str}</span></div>
+                <div class="kpi-sub">Meta: <b>{meta_incapacitado}</b> | <span style="color: {color_cump_incapacitado}; font-weight: 800;">{cump_incapacitado_str}</span></div>
             </div>
         """,
         unsafe_allow_html=True,
