@@ -1,6 +1,8 @@
 import streamlit as st
+import pandas as pd
+import sqlalchemy
 
-# Configuración inicial de la página
+# 1. Configuración de la página
 st.set_page_config(
     page_title="EXPRESS SAN SILVESTRE - Capital Humano",
     page_icon="🚛",
@@ -8,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS Personalizados para replicar el diseño exacto del menú lateral
+# 2. Estilos CSS Personalizados para el menú y tableros
 st.markdown("""
 <style>
     /* Estilo del contenedor del Sidebar */
@@ -16,12 +18,9 @@ st.markdown("""
         background-color: #121929 !important;
         padding-top: 1rem;
     }
-    
     [data-testid="stSidebar"] > div:first-child {
         background-color: #121929 !important;
     }
-
-    /* Ocultar elementos predeterminados de Streamlit en el sidebar */
     [data-testid="stSidebarNav"] {
         display: none;
     }
@@ -35,7 +34,6 @@ st.markdown("""
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         margin-bottom: 15px;
     }
-
     .logo-box {
         background-color: #D9232E;
         color: white;
@@ -44,27 +42,21 @@ st.markdown("""
         padding: 8px 10px;
         border-radius: 8px;
         letter-spacing: 1px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
-
     .header-text h3 {
         color: #FFFFFF;
         font-size: 15px;
         font-weight: 800;
         margin: 0;
         line-height: 1.2;
-        letter-spacing: 0.5px;
     }
-
     .header-text p {
         color: #718096;
         font-size: 11px;
         margin: 2px 0 0 0;
     }
 
-    /* Títulos de Categoría (Submenús) */
+    /* Categorías del Menú */
     .menu-category {
         color: #52637A;
         font-size: 11px;
@@ -76,7 +68,7 @@ st.markdown("""
         padding-left: 10px;
     }
 
-    /* Estilizado de los Botones de Menú en Streamlit */
+    /* Botones Sidebar */
     div[data-testid="stSidebar"] div.stButton > button {
         width: 100%;
         background-color: transparent;
@@ -89,32 +81,13 @@ st.markdown("""
         font-size: 14px;
         font-weight: 500;
         transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
     }
-
     div[data-testid="stSidebar"] div.stButton > button:hover {
         background-color: #1A243B;
         color: #FFFFFF;
     }
 
-    /* Botón Activo (Seleccionado) */
-    div[data-testid="stSidebar"] div.stButton > button[aria-selected="true"],
-    div[data-testid="stSidebar"] div.stButton > button.active-menu-item {
-        background-color: #1E2B45 !important;
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        box-shadow: inset 3px 0px 0px #3182CE;
-    }
-
-    /* Fila con Alerta/Badge (FAST TRACK, Vencimientos, Bonos) */
-    .menu-item-with-badge {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-    }
-
+    /* Badges de Alerta */
     .badge-red {
         background-color: #E53E3E;
         color: white;
@@ -126,39 +99,51 @@ st.markdown("""
         text-align: center;
     }
 
-    /* Footer / Perfil de Usuario */
+    /* Tarjetas KPI del Dashboard */
+    .kpi-card {
+        background-color: #FFFFFF;
+        border-radius: 10px;
+        padding: 15px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        text-align: center;
+    }
+    .kpi-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #1E293B;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+    .kpi-value {
+        font-size: 24px;
+        font-weight: 800;
+        color: #0F172A;
+    }
+    .kpi-sub {
+        font-size: 12px;
+        color: #64748B;
+        margin-top: 4px;
+    }
+
+    /* Footer de Usuario */
     .user-profile-section {
         margin-top: 30px;
         padding-top: 15px;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
-
     .user-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
         color: #A0AEC0;
         font-size: 13px;
         font-weight: 600;
         margin-bottom: 12px;
         padding-left: 5px;
     }
-
-    /* Botón de Cerrar Sesión Especial */
     .logout-container div.stButton > button {
         background-color: #2D1820 !important;
         color: #E53E3E !important;
         border: 1px solid #4A1D24 !important;
-        font-weight: 600 !important;
-        text-align: center !important;
-        justify-content: center !important;
     }
-
-    .logout-container div.stButton > button:hover {
-        background-color: #3D1C26 !important;
-        color: #FC8181 !important;
-    }
-
     .version-tag {
         color: #4A5568;
         font-size: 11px;
@@ -168,16 +153,32 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Inicializar estado de navegación si no existe
+# 3. Función de Conexión a Azure SQL
+@st.cache_data(ttl=600)
+def cargar_datos_sql(query):
+    try:
+        # Intenta leer desde los Secrets configurados en Streamlit Cloud
+        server = st.secrets["sql_server"]["server"]
+        database = st.secrets["sql_server"]["database"]
+        username = st.secrets["sql_server"]["username"]
+        password = st.secrets["sql_server"]["password"]
+
+        conn_str = f"mssql+pyodbc://{username}:{password}@{server}/{database}?driver=ODBC+Driver+17+for+SQL+Server"
+        engine = sqlalchemy.create_engine(conn_str)
+        return pd.read_sql(query, engine)
+    except Exception:
+        # Retorna DataFrame vacío si aún no están configurados los Secrets
+        return pd.DataFrame()
+
+# 4. Estado de Navegación
 if 'pagina_actual' not in st.session_state:
     st.session_state['pagina_actual'] = 'Dashboard'
 
 def cambiar_pagina(nombre_pagina):
     st.session_state['pagina_actual'] = nombre_pagina
 
-# --- RENDERIZADO DEL SIDEBAR ---
+# --- MENÚ LATERAL (SIDEBAR) ---
 with st.sidebar:
-    # 1. Header con Logo y Nombre de Empresa
     st.markdown("""
         <div class="sidebar-header">
             <div class="logo-box">ESS</div>
@@ -188,98 +189,177 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
 
-    # 2. Categoría: PRINCIPAL
     st.markdown('<div class="menu-category">PRINCIPAL</div>', unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([1, 1])
-    if st.button("🗂️  Dashboard", key="btn_dashboard", use_container_width=True):
-        cambiar_pagina("Dashboard")
-        
-    if st.button("➕  Registro de Alta", key="btn_alta", use_container_width=True):
-        cambiar_pagina("Registro de Alta")
+    if st.button("🗂️  Dashboard", key="btn_dash"): cambiar_pagina("Dashboard")
+    if st.button("➕  Registro de Alta", key="btn_alta"): cambiar_pagina("Registro de Alta")
 
-    # 3. Categoría: BASES DE DATOS
     st.markdown('<div class="menu-category">BASES DE DATOS</div>', unsafe_allow_html=True)
-    if st.button("🚚  Operadores", key="btn_operadores", use_container_width=True):
-        cambiar_pagina("Operadores")
-        
-    if st.button("💼  Admon / Mtto", key="btn_admon", use_container_width=True):
-        cambiar_pagina("Admon / Mtto")
+    if st.button("🚚  Operadores", key="btn_ops"): cambiar_pagina("Operadores")
+    if st.button("💼  Admon / Mtto", key="btn_admon"): cambiar_pagina("Admon / Mtto")
 
-    # 4. Categoría: ALERTAS (con Badges)
     st.markdown('<div class="menu-category">ALERTAS</div>', unsafe_allow_html=True)
-    
-    col_btn, col_badge = st.columns([0.8, 0.2])
-    with col_btn:
-        if st.button("💳  FAST TRACK", key="btn_fasttrack", use_container_width=True):
-            cambiar_pagina("FAST TRACK")
-    with col_badge:
-        st.markdown('<div style="padding-top:8px;"><span class="badge-red">26</span></div>', unsafe_allow_html=True)
+    c1, c2 = st.columns([0.8, 0.2])
+    with c1:
+        if st.button("💳  FAST TRACK", key="btn_ft"): cambiar_pagina("FAST TRACK")
+    with c2: st.markdown('<div style="padding-top:8px;"><span class="badge-red">26</span></div>', unsafe_allow_html=True)
 
-    col_btn2, col_badge2 = st.columns([0.8, 0.2])
-    with col_btn2:
-        if st.button("⚠️  Vencimientos", key="btn_vencimientos", use_container_width=True):
-            cambiar_pagina("Vencimientos")
-    with col_badge2:
-        st.markdown('<div style="padding-top:8px;"><span class="badge-red">6</span></div>', unsafe_allow_html=True)
+    c1, c2 = st.columns([0.8, 0.2])
+    with c1:
+        if st.button("⚠️  Vencimientos", key="btn_venc"): cambiar_pagina("Vencimientos")
+    with c2: st.markdown('<div style="padding-top:8px;"><span class="badge-red">6</span></div>', unsafe_allow_html=True)
 
-    col_btn3, col_badge3 = st.columns([0.8, 0.2])
-    with col_btn3:
-        if st.button("💰  Bonos", key="btn_bonos", use_container_width=True):
-            cambiar_pagina("Bonos")
-    with col_badge3:
-        st.markdown('<div style="padding-top:8px;"><span class="badge-red">7</span></div>', unsafe_allow_html=True)
+    c1, c2 = st.columns([0.8, 0.2])
+    with c1:
+        if st.button("💰  Bonos", key="btn_bonos"): cambiar_pagina("Bonos")
+    with c2: st.markdown('<div style="padding-top:8px;"><span class="badge-red">7</span></div>', unsafe_allow_html=True)
 
-    # 5. Categoría: RECLUTAMIENTO
     st.markdown('<div class="menu-category">RECLUTAMIENTO</div>', unsafe_allow_html=True)
-    if st.button("📊  Resumen", key="btn_resumen", use_container_width=True):
-        cambiar_pagina("Resumen")
-        
-    if st.button("🎯  Seguimiento", key="btn_seguimiento", use_container_width=True):
-        cambiar_pagina("Seguimiento")
+    if st.button("📊  Resumen", key="btn_res"): cambiar_pagina("Resumen")
+    if st.button("🎯  Seguimiento", key="btn_seg"): cambiar_pagina("Seguimiento")
 
-    # 6. Categoría: CARTAS MEJORA
     st.markdown('<div class="menu-category">CARTAS MEJORA</div>', unsafe_allow_html=True)
-    if st.button("📋  Control de C.M.", key="btn_control_cm", use_container_width=True):
-        cambiar_pagina("Control de C.M.")
-        
-    if st.button("✏️  Registro C.M.", key="btn_registro_cm", use_container_width=True):
-        cambiar_pagina("Registro C.M.")
+    if st.button("📋  Control de C.M.", key="btn_cm_ctrl"): cambiar_pagina("Control de C.M.")
+    if st.button("✏️  Registro C.M.", key="btn_cm_reg"): cambiar_pagina("Registro C.M.")
 
-    # 7. Categoría: SISTEMA
     st.markdown('<div class="menu-category">SISTEMA</div>', unsafe_allow_html=True)
-    if st.button("⚙️  Administrador", key="btn_admin", use_container_width=True):
-        cambiar_pagina("Administrador")
+    if st.button("⚙️  Administrador", key="btn_admin"): cambiar_pagina("Administrador")
 
-    # 8. Footer de Usuario y Cerrar Sesión
     st.markdown('<div class="user-profile-section"></div>', unsafe_allow_html=True)
     st.markdown('<div class="user-info">👤  Administrador</div>', unsafe_allow_html=True)
-    
     st.markdown('<div class="logout-container">', unsafe_allow_html=True)
-    if st.button("🚪  Cerrar sesión", key="btn_logout", use_container_width=True):
-        st.toast("Sesión cerrada")
+    if st.button("🚪  Cerrar sesión", key="btn_logout"): st.toast("Sesión cerrada")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="version-tag">v2.3 Firebase · ESS Capital Humano</div>', unsafe_allow_html=True)
+    st.markdown('<div class="version-tag">v2.3 Azure SQL · ESS Capital Humano</div>', unsafe_allow_html=True)
 
 
-# --- CONTENIDO PRINCIPAL (Según la opción seleccionada) ---
+# --- CONTENIDO PRINCIPAL ---
 pagina = st.session_state['pagina_actual']
 
-st.title(f"📌 {pagina}")
-st.write(f"Bienvenido al módulo de **{pagina}**.")
-
-# Ejemplo de vista para el Dashboard
 if pagina == "Dashboard":
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Operadores Activos", "142", "+4 este mes")
-    col2.metric("Alertas Vencimiento", "6", "-2 hoy", delta_color="inverse")
-    col3.metric("Solicitudes Fast Track", "26", "Pendientes")
-    col4.metric("Bonos Registrados", "7", "Procesando")
-    
-    st.subheader("Últimos Registros")
-    st.dataframe({
-        "Nombre": ["Rogelio A.", "Giovanni M.", "Porfirio H.", "Cristhian C."],
-        "Puesto": ["Operador", "Operador", "Mantenimiento", "Operador"],
-        "Estatus": ["Activo", "Activo", "En revisión", "Activo"]
-    }, use_container_width=True)
+    st.markdown("## 📊 Indicadores Capital Humano")
+    st.caption("Express San Silvestre — Panel de Control Centralizado")
+    st.divider()
+
+    # Intentar cargar datos de Azure SQL
+    df_operadores = cargar_datos_sql("SELECT * FROM Operadores")
+
+    # Si hay datos reales los calcula, de lo contrario muestra las métricas base del tablero
+    unidades_val = 122
+    plantilla_real = len(df_operadores) if not df_operadores.empty else 125
+    plantilla_auth = 134
+    cumplimiento_plantilla = f"{(plantilla_real / plantilla_auth) * 100:.2f}%"
+
+    # Fila 1: KPIs Principales (Semicards superior)
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    with col1:
+        st.markdown(f'''
+            <div class="kpi-card">
+                <div class="kpi-title">Unidades</div>
+                <div class="kpi-value">🚜 {unidades_val}</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f'''
+            <div class="kpi-card">
+                <div class="kpi-title">Plantilla Activa</div>
+                <div class="kpi-value" style="color: #D9232E;">{cumplimiento_plantilla}</div>
+                <div class="kpi-sub">Real: {plantilla_real} | Auth: {plantilla_auth}</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with col3:
+        st.markdown('''
+            <div class="kpi-card">
+                <div class="kpi-title">Rotación del Mes</div>
+                <div class="kpi-value" style="color: #10B981;">0.00%</div>
+                <div class="kpi-sub">% Mes Anterior: --</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with col4:
+        st.markdown('''
+            <div class="kpi-card">
+                <div class="kpi-title">Tasa Contratación</div>
+                <div class="kpi-value">--</div>
+                <div class="kpi-sub">Mes Act. vs Mes Ant.</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with col5:
+        st.markdown('''
+            <div class="kpi-card">
+                <div class="kpi-title">Por Contratar</div>
+                <div class="kpi-value" style="color: #2563EB;">9</div>
+                <div class="kpi-sub">Vacantes Libres</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    st.write("")
+
+    # Fila 2: Desglose por Tipo de Operador
+    st.markdown("##### 🚚 Distribución por Puesto / Operación")
+    p1, p2, p3, p4, p5 = st.columns(5)
+
+    with p1:
+        st.markdown('''
+            <div class="kpi-card">
+                <div class="kpi-title">Sencillo + Regio</div>
+                <div class="kpi-value">112</div>
+                <div class="kpi-sub">Unidades: 116 | <b style="color:#10B981;">97%</b></div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with p2:
+        st.markdown('''
+            <div class="kpi-card">
+                <div class="kpi-title">Operador Full</div>
+                <div class="kpi-value">1</div>
+                <div class="kpi-sub">Unidades: 1 | <b style="color:#10B981;">100%</b></div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with p3:
+        st.markdown('''
+            <div class="kpi-card">
+                <div class="kpi-title">Operador Patio</div>
+                <div class="kpi-value">5</div>
+                <div class="kpi-sub">Unidades: 5 | <b style="color:#10B981;">100%</b></div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with p4:
+        st.markdown('''
+            <div class="kpi-card">
+                <div class="kpi-title">Operador Postura</div>
+                <div class="kpi-value">7</div>
+                <div class="kpi-sub">Obj: 12 | <b style="color:#EF4444;">57%</b></div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    with p5:
+        st.markdown('''
+            <div class="kpi-card">
+                <div class="kpi-title">Incapacitado</div>
+                <div class="kpi-value">3</div>
+                <div class="kpi-sub">Obj: 0 | % --</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    st.divider()
+
+    # Fila 3: Indicadores de Licencias y Alertas del Operador
+    st.markdown("##### ⚠️ Indicadores de Documentación y Alertas")
+    a1, a2, a3, a4, a5 = st.columns(5)
+
+    a1.metric("Licencias Vencidas", "10", delta="-10 Critical", delta_color="inverse")
+    a2.metric("Lic. por Vencer (<90D)", "9", delta="Atención", delta_color="off")
+    a3.metric("Doping Vencido", "55", delta="Pendientes", delta_color="inverse")
+    a4.metric("Doping (<30D)", "21", delta="Próximos", delta_color="off")
+    a5.metric("% Cump. Antidoping", "56.00%", delta="Meta: 100%")
+
+else:
+    st.title(f"📌 {pagina}")
+    st.info(f"El módulo de **{pagina}** está listo para conectar sus tablas de datos.")
