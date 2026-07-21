@@ -292,7 +292,7 @@ if pagina == "Dashboard":
   incapacitado_cnt = conteo_puestos.get("OPERADOR INCAPACITADO", 0)
 
   # ---------------------------------------------------------
-  # FILA 1: TARJETAS PRINCIPALES (ESTRUCTURA HOMOGÉNEA)
+  # FILA 1: TARJETAS PRINCIPALES (4 COLUMNAS UNIFORMES)
   # ---------------------------------------------------------
   col1, col2, col3, col4 = st.columns(4)
 
@@ -350,7 +350,7 @@ if pagina == "Dashboard":
                     <div class="kpi-title">Tasa de Contratación</div>
                     <div class="kpi-value" style="color: #1D4ED8;">{tasa_mes_act_str}</div>
                 </div>
-                <div class="kpi-sub">Mes Ant: <b>{tasa_mes_ant_str}</b> | Altas / Bajas</div>
+                <div class="kpi-sub">Mes Ant: <b>{tasa_mes_ant_str}</b></div>
             </div>
         """,
         unsafe_allow_html=True,
