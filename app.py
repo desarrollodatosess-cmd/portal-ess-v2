@@ -653,7 +653,7 @@ if pagina == "Dashboard":
                 </div>
                 <div class="history-grid">
                     <div class="history-item">
-                        <div class="history-label">Altas / Mes</div>
+                        <div class="history-label">Altas Del Mes</div>
                         <div class="history-value-altas">{datos_altas['mes_actual']}</div>
                     </div>
                     <div class="history-item">
