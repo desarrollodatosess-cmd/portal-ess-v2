@@ -20,6 +20,7 @@ st.set_page_config(
 st.markdown(
     """
 <style>
+    /* Estilos del Sidebar */
     [data-testid="stSidebar"] { background-color: #121929 !important; padding-top: 1rem; }
     [data-testid="stSidebarNav"] { display: none; }
     .sidebar-header { display: flex; align-items: center; gap: 12px; padding: 10px 8px 15px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 15px; }
@@ -31,6 +32,7 @@ st.markdown(
     div[data-testid="stSidebar"] div.stButton > button:hover { background-color: #1A243B; color: #FFFFFF; }
     .last-update-badge { background-color: #1E293B; color: #38BDF8; border: 1px solid #0284C7; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 20px; display: inline-block; }
 
+    /* Tarjetas KPI de Fila 1 y 2 */
     .kpi-card {
         background: linear-gradient(135deg, #EFF6FF 0%, #E0F2FE 100%);
         border-radius: 18px;
@@ -91,6 +93,80 @@ st.markdown(
         align-items: center;
         justify-content: center;
         font-size: 20px;
+    }
+
+    /* Tarjetas de Histórico de Movimientos */
+    .history-card {
+        background: #FFFFFF;
+        border-radius: 16px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+        margin-top: 8px;
+    }
+
+    .card-header-altas {
+        background: linear-gradient(90deg, #065F46 0%, #047857 100%);
+        color: #FFFFFF;
+        font-weight: 800;
+        font-size: 13px;
+        padding: 10px 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .card-header-bajas {
+        background: linear-gradient(90deg, #991B1B 0%, #B91C1C 100%);
+        color: #FFFFFF;
+        font-weight: 800;
+        font-size: 13px;
+        padding: 10px 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .history-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        padding: 16px 8px;
+        text-align: center;
+    }
+
+    .history-item {
+        border-right: 1px solid #F1F5F9;
+        padding: 0 8px;
+    }
+
+    .history-item:last-child {
+        border-right: none;
+    }
+
+    .history-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748B;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .history-value-altas {
+        font-size: 24px;
+        font-weight: 900;
+        color: #047857;
+        line-height: 1;
+    }
+
+    .history-value-bajas {
+        font-size: 24px;
+        font-weight: 900;
+        color: #B91C1C;
+        line-height: 1;
     }
 </style>
 """,
@@ -373,7 +449,7 @@ if pagina == "Dashboard":
       f"{(act_postura / meta_postura) * 100:.0f}%" if meta_postura > 0 else "0%"
   )
 
-  # 5. OPERADOR INCAPACITADO (CORREGIDO PARA CUMPLIMIENTO PORCENTUAL)
+  # 5. OPERADOR INCAPACITADO
   if not df_operadores.empty:
     cond_incapacitado = (df_operadores["FechaBaja"].isna()) & (
         df_operadores["Puesto"].astype(str).str.upper() == "OPERADOR INCAPACITADO"
@@ -538,6 +614,91 @@ if pagina == "Dashboard":
                     <div class="kpi-value" style="color: #D97706;">{act_incapacitado}</div>
                 </div>
                 <div class="kpi-sub">Meta: <b>{meta_incapacitado}</b> | <span style="color: {color_cump_incapacitado}; font-weight: 800;">{cump_incapacitado_str}</span></div>
+            </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+  st.write("")
+  st.write("")
+
+  # ---------------------------------------------------------
+  # FILA 3: HISTÓRICO DE MOVIMIENTOS (ALTAS Y BAJAS)
+  # ---------------------------------------------------------
+  st.markdown("##### 📈 Histórico de Movimientos de Personal")
+
+  # Datos temporales ficticios para visualización
+  datos_altas = {
+      "mes_actual": 12,
+      "mes_menos_1": 15,
+      "mes_menos_2": 10,
+      "ano_actual": 27,
+  }
+
+  datos_bajas = {
+      "mes_actual": 13,
+      "mes_menos_1": 13,
+      "mes_menos_2": 9,
+      "ano_actual": 26,
+  }
+
+  col_altas, col_bajas = st.columns(2)
+
+  with col_altas:
+    st.markdown(
+        f"""
+            <div class="history-card">
+                <div class="card-header-altas">
+                    <span>📈</span> Histórico de Altas
+                </div>
+                <div class="history-grid">
+                    <div class="history-item">
+                        <div class="history-label">Altas / Mes</div>
+                        <div class="history-value-altas">{datos_altas['mes_actual']}</div>
+                    </div>
+                    <div class="history-item">
+                        <div class="history-label">Altas -1</div>
+                        <div class="history-value-altas">{datos_altas['mes_menos_1']}</div>
+                    </div>
+                    <div class="history-item">
+                        <div class="history-label">Altas -2</div>
+                        <div class="history-value-altas">{datos_altas['mes_menos_2']}</div>
+                    </div>
+                    <div class="history-item">
+                        <div class="history-label">Altas Año Act.</div>
+                        <div class="history-value-altas">{datos_altas['ano_actual']}</div>
+                    </div>
+                </div>
+            </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+  with col_bajas:
+    st.markdown(
+        f"""
+            <div class="history-card">
+                <div class="card-header-bajas">
+                    <span>📉</span> Histórico de Bajas
+                </div>
+                <div class="history-grid">
+                    <div class="history-item">
+                        <div class="history-label">Bajas / Mes</div>
+                        <div class="history-value-bajas">{datos_bajas['mes_actual']}</div>
+                    </div>
+                    <div class="history-item">
+                        <div class="history-label">Bajas -1</div>
+                        <div class="history-value-bajas">{datos_bajas['mes_menos_1']}</div>
+                    </div>
+                    <div class="history-item">
+                        <div class="history-label">Bajas -2</div>
+                        <div class="history-value-bajas">{datos_bajas['mes_menos_2']}</div>
+                    </div>
+                    <div class="history-item">
+                        <div class="history-label">Bajas Año Act.</div>
+                        <div class="history-value-bajas">{datos_bajas['ano_actual']}</div>
+                    </div>
+                </div>
             </div>
         """,
         unsafe_allow_html=True,
