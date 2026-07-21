@@ -390,7 +390,7 @@ if pagina == "Dashboard":
                     <div class="kpi-title">Sencillo + Regio</div>
                     <div class="kpi-value" style="color: #1D4ED8;">{act_sencillo}</div>
                 </div>
-                <div class="kpi-sub">Act: <b>{act_sencillo}</b> | Unidades: <b>{unidades_sencillo}</b> | <span style="color: #059669; font-weight: 800;">{cump_sencillo_str}</span></div>
+                <div class="kpi-sub">Unidades: <b>{unidades_sencillo}</b> | <span style="color: #059669; font-weight: 800;">{cump_sencillo_str}</span></div>
             </div>
         """,
         unsafe_allow_html=True,
