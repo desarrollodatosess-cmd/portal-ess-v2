@@ -258,8 +258,7 @@ if pagina == "Dashboard":
       tasa_ant = altas_ant / bajas_ant
       tasa_mes_ant_str = f"{tasa_ant * 100:.2f}%"
 
-  # --- CÁLCULOS FILA 2 ---
-  # Preparar df_unidades_copy normalizado
+  # --- PREPARACIÓN DF UNIDADES NORMALIZADO ---
   if not df_unidades.empty:
     df_unidades_copy = df_unidades.copy()
     if "Estatus" in df_unidades_copy.columns:
@@ -272,7 +271,7 @@ if pagina == "Dashboard":
       )
     if "GrupoUnidad" in df_unidades_copy.columns:
       df_unidades_copy["GrupoUnidad"] = (
-          df_unidades_copy["GrupoUnidad"].astype(str).str.upper()
+          df_unidades_copy["GrupoUnidad"].astype(str).str.upper().str.strip()
       )
   else:
     df_unidades_copy = pd.DataFrame()
@@ -349,12 +348,36 @@ if pagina == "Dashboard":
       f"{(act_patio / unidades_patio) * 100:.0f}%" if unidades_patio > 0 else "0%"
   )
 
-  # OTROS PUESTOS
+  # 4. OPERADOR POSTURA
+  if not df_operadores.empty:
+    cond_postura = (df_operadores["FechaBaja"].isna()) & (
+        df_operadores["Puesto"].astype(str).str.upper() == "OPERADOR POSTURA"
+    )
+    act_postura = df_operadores[cond_postura]["Numero"].nunique()
+  else:
+    act_postura = 0
+
+  if not df_unidades_copy.empty:
+    excluir_grupos = ["A VENTA", "SINIESTRO", "MULA", "", "NONE", "NAN"]
+    cond_unidades_postura = (
+        (df_unidades_copy["Estatus"] == "ACTIVA")
+        & (df_unidades_copy["TipoUnidad"] == "TRACTOCAMION")
+        & (~df_unidades_copy["GrupoUnidad"].isin(excluir_grupos))
+    )
+    unidades_activas_postura = len(df_unidades_copy[cond_unidades_postura])
+  else:
+    unidades_activas_postura = 0
+
+  meta_postura = unidades_activas_postura / 10.0
+  cump_postura_str = (
+      f"{(act_postura / meta_postura) * 100:.0f}%" if meta_postura > 0 else "0%"
+  )
+
+  # OTROS PUESTOS (INCAPACITADOS)
   conteo_puestos = {}
   if not df_operadores.empty and "Puesto" in df_operadores.columns:
     conteo_puestos = df_operadores["Puesto"].value_counts().to_dict()
 
-  postura_cnt = conteo_puestos.get("OPERADOR POSTURA", 0)
   incapacitado_cnt = conteo_puestos.get("OPERADOR INCAPACITADO", 0)
 
   # ---------------------------------------------------------
@@ -484,9 +507,9 @@ if pagina == "Dashboard":
                 <div class="kpi-icon-badge">🅿️</div>
                 <div>
                     <div class="kpi-title">Operador Postura</div>
-                    <div class="kpi-value" style="color: #1D4ED8;">{postura_cnt}</div>
+                    <div class="kpi-value" style="color: #1D4ED8;">{act_postura}</div>
                 </div>
-                <div class="kpi-sub">Operadores activos</div>
+                <div class="kpi-sub">Meta: <b>{meta_postura:.1f}</b> | <span style="color: #059669; font-weight: 800;">{cump_postura_str}</span></div>
             </div>
         """,
         unsafe_allow_html=True,
