@@ -1,4 +1,5 @@
 import datetime
+import calendar
 import pandas as pd
 import sqlalchemy
 import streamlit as st
@@ -93,6 +94,31 @@ st.markdown(
         justify-content: center;
         font-size: 20px;
     }
+
+    /* Estilos especiales para la tarjeta doble (Tasa de Contratación) */
+    .dual-value-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-top: 4px;
+    }
+
+    .dual-value-box {
+        text-align: left;
+    }
+
+    .dual-value-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #64748B;
+        text-transform: uppercase;
+    }
+
+    .dual-value-num {
+        font-size: 22px;
+        font-weight: 900;
+        color: #1D4ED8;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -186,12 +212,11 @@ if pagina == "Dashboard":
   df_unidades = cargar_datos_sql("SELECT * FROM Unidades")
 
   # ---------------------------------------------------------
-  # CÁLCULOS EXACTOS SEGÚN MEDIDAS DAX DE POWER BI
+  # CÁLCULOS MEDIDAS DAX EN PYTHON
   # ---------------------------------------------------------
 
   # 1. Unidades Activas
   if not df_unidades.empty:
-    # Si existe columna Estatus/Activa en Unidades la usamos, de lo contrario se cuentan todas
     unidades_activas = (
         len(df_unidades[df_unidades["Estatus"] == "ACTIVA"])
         if "Estatus" in df_unidades.columns
@@ -202,30 +227,83 @@ if pagina == "Dashboard":
 
   # 2. Plantilla Autorizada = [Unidades Activas] * 1.1
   plantilla_autorizada = int(round(unidades_activas * 1.1))
-
-  # Si aún no carga SQL o da 0, fallback visual a 134 como en tu captura
   if plantilla_autorizada == 0:
     plantilla_autorizada = 134
 
-  # 3. Operadores Activos sin NA (Filtro DAX exacto)
+  # 3. Operadores Activos sin NA
   if not df_operadores.empty:
     condicion_activos = df_operadores["FechaBaja"].isna() & (
         df_operadores["Puesto"] != "NA"
     ) & (df_operadores["Puesto"] != "OPERADOR INCAPACITADO")
-
     df_activos_sin_na = df_operadores[condicion_activos]
     plantilla_real = df_activos_sin_na["Numero"].nunique()
   else:
     plantilla_real = 0
 
   # 4. Operadores vs Plantilla Autorizada (%)
-  if plantilla_autorizada > 0:
-    pct_cumplimiento = (plantilla_real / plantilla_autorizada) * 100
-    cumplimiento_str = f"{pct_cumplimiento:.2f}%"
-  else:
-    cumplimiento_str = "0.00%"
-
+  cumplimiento_str = (
+      f"{(plantilla_real / plantilla_autorizada) * 100:.2f}%"
+      if plantilla_autorizada > 0
+      else "0.00%"
+  )
   vacantes = max(0, plantilla_autorizada - plantilla_real)
+
+  # ---------------------------------------------------------
+  # CÁLCULO DE TASA DE CONTRATACIÓN (MES ACT. VS MES ANT.)
+  # ---------------------------------------------------------
+  hoy = datetime.date.today()
+
+  # Mes Actual (Fechas Inicio / Fin)
+  inicio_mes_act = datetime.date(hoy.year, hoy.month, 1)
+  dias_mes_act = calendar.monthrange(hoy.year, hoy.month)[1]
+  fin_mes_act = datetime.date(hoy.year, hoy.month, dias_mes_act)
+
+  # Mes Anterior (Fechas Inicio / Fin)
+  primer_dia_mes_act = datetime.date(hoy.year, hoy.month, 1)
+  fin_mes_ant = primer_dia_mes_act - datetime.timedelta(days=1)
+  inicio_mes_ant = datetime.date(fin_mes_ant.year, fin_mes_ant.month, 1)
+
+  tasa_mes_act_str = "--"
+  tasa_mes_ant_str = "--"
+
+  if not df_operadores.empty:
+    # Aseguramos formato fecha
+    df_operadores["FechaContratacion"] = pd.to_datetime(
+        df_operadores["FechaContratacion"], errors="coerce"
+    ).dt.date
+    df_operadores["FechaBaja"] = pd.to_datetime(
+        df_operadores["FechaBaja"], errors="coerce"
+    ).dt.date
+
+    # --- MES ACTUAL ---
+    altas_act = df_operadores[
+        (df_operadores["FechaContratacion"] >= inicio_mes_act)
+        & (df_operadores["FechaContratacion"] <= fin_mes_act)
+    ]["Numero"].nunique()
+
+    bajas_act = df_operadores[
+        (df_operadores["FechaBaja"] >= inicio_mes_act)
+        & (df_operadores["FechaBaja"] <= fin_mes_act)
+    ]["Numero"].nunique()
+
+    if bajas_act > 0:
+      tasa_act = altas_act / bajas_act
+      tasa_mes_act_str = f"{tasa_act * 100:.2f}%"
+
+    # --- MES ANTERIOR ---
+    altas_ant = df_operadores[
+        (df_operadores["FechaContratacion"] >= inicio_mes_ant)
+        & (df_operadores["FechaContratacion"] <= fin_mes_ant)
+    ]["Numero"].nunique()
+
+    bajas_ant = df_operadores[
+        (df_operadores["FechaBaja"] >= inicio_mes_ant)
+        & (df_operadores["FechaBaja"] <= fin_mes_ant)
+    ]["Numero"].nunique()
+
+    if bajas_ant > 0:
+      tasa_ant = altas_ant / bajas_ant
+      tasa_mes_ant_str = f"{tasa_ant * 100:.2f}%"
 
   # Conteo por puestos para la fila 2
   conteo_puestos = {}
@@ -307,14 +385,23 @@ if pagina == "Dashboard":
 
   with col5:
     st.markdown(
-        """
+        f"""
             <div class="kpi-card">
                 <div class="kpi-icon-badge">📈</div>
                 <div>
-                    <div class="kpi-title">Contratación</div>
-                    <div class="kpi-value" style="color: #4F46E5;">--</div>
+                    <div class="kpi-title">Tasa de Contratación</div>
+                    <div class="dual-value-container">
+                        <div class="dual-value-box">
+                            <div class="dual-value-label">Mes Act.</div>
+                            <div class="dual-value-num" style="color: #4F46E5;">{tasa_mes_act_str}</div>
+                        </div>
+                        <div class="dual-value-box">
+                            <div class="dual-value-label">Mes Ant.</div>
+                            <div class="dual-value-num" style="color: #6366F1;">{tasa_mes_ant_str}</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="kpi-sub">Tasa del mes</div>
+                <div class="kpi-sub">Altas / Bajas</div>
             </div>
         """,
         unsafe_allow_html=True,
