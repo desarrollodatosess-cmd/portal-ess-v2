@@ -258,7 +258,8 @@ if pagina == "Dashboard":
       tasa_ant = altas_ant / bajas_ant
       tasa_mes_ant_str = f"{tasa_ant * 100:.2f}%"
 
-  # --- CÁLCULOS FILA 2 (SENCILLO + REGIO) ---
+  # --- CÁLCULOS FILA 2 ---
+  # 1. SENCILLO + REGIO
   if not df_operadores.empty:
     cond_sencillo_regio = (
         df_operadores["FechaBaja"].isna()
@@ -292,16 +293,40 @@ if pagina == "Dashboard":
   else:
     unidades_sencillo = 0
 
-  if unidades_sencillo > 0:
-    cump_sencillo_str = f"{(act_sencillo / unidades_sencillo) * 100:.0f}%"
-  else:
-    cump_sencillo_str = "0%"
+  cump_sencillo_str = (
+      f"{(act_sencillo / unidades_sencillo) * 100:.0f}%"
+      if unidades_sencillo > 0
+      else "0%"
+  )
 
+  # 2. OPERADOR FULL
+  if not df_operadores.empty:
+    cond_full = (df_operadores["FechaBaja"].isna()) & (
+        df_operadores["Puesto"] == "OPERADOR FULL"
+    )
+    act_full = df_operadores[cond_full]["Numero"].nunique()
+  else:
+    act_full = 0
+
+  if not df_unidades.empty:
+    cond_unidades_full = (
+        (df_unidades_copy["Estatus"] == "ACTIVA")
+        & (df_unidades_copy["TipoUnidad"] == "TRACTOCAMION")
+        & (df_unidades_copy["GrupoUnidad"] == "FULL")
+    )
+    unidades_full = len(df_unidades_copy[cond_unidades_full])
+  else:
+    unidades_full = 0
+
+  cump_full_str = (
+      f"{(act_full / unidades_full) * 100:.0f}%" if unidades_full > 0 else "0%"
+  )
+
+  # OTROS PUESTOS
   conteo_puestos = {}
   if not df_operadores.empty and "Puesto" in df_operadores.columns:
     conteo_puestos = df_operadores["Puesto"].value_counts().to_dict()
 
-  full_cnt = conteo_puestos.get("OPERADOR FULL", 0)
   patio_cnt = conteo_puestos.get("OPERADOR PATIO", 0)
   postura_cnt = conteo_puestos.get("OPERADOR POSTURA", 0)
   incapacitado_cnt = conteo_puestos.get("OPERADOR INCAPACITADO", 0)
@@ -403,9 +428,9 @@ if pagina == "Dashboard":
                 <div class="kpi-icon-badge">🚛</div>
                 <div>
                     <div class="kpi-title">Operador Full</div>
-                    <div class="kpi-value" style="color: #1D4ED8;">{full_cnt}</div>
+                    <div class="kpi-value" style="color: #1D4ED8;">{act_full}</div>
                 </div>
-                <div class="kpi-sub">Operadores activos</div>
+                <div class="kpi-sub">Unidades: <b>{unidades_full}</b> | <span style="color: #059669; font-weight: 800;">{cump_full_str}</span></div>
             </div>
         """,
         unsafe_allow_html=True,
