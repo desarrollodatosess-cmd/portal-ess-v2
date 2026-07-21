@@ -259,16 +259,7 @@ if pagina == "Dashboard":
       tasa_mes_ant_str = f"{tasa_ant * 100:.2f}%"
 
   # --- CÁLCULOS FILA 2 ---
-  # 1. SENCILLO + REGIO
-  if not df_operadores.empty:
-    cond_sencillo_regio = (
-        df_operadores["FechaBaja"].isna()
-        & df_operadores["Puesto"].isin(["OPERADOR SENCILLO", "OPERADOR REGIO"])
-    )
-    act_sencillo = df_operadores[cond_sencillo_regio]["Numero"].nunique()
-  else:
-    act_sencillo = 0
-
+  # Preparar df_unidades_copy normalizado
   if not df_unidades.empty:
     df_unidades_copy = df_unidades.copy()
     if "Estatus" in df_unidades_copy.columns:
@@ -283,7 +274,20 @@ if pagina == "Dashboard":
       df_unidades_copy["GrupoUnidad"] = (
           df_unidades_copy["GrupoUnidad"].astype(str).str.upper()
       )
+  else:
+    df_unidades_copy = pd.DataFrame()
 
+  # 1. SENCILLO + REGIO
+  if not df_operadores.empty:
+    cond_sencillo_regio = (
+        df_operadores["FechaBaja"].isna()
+        & df_operadores["Puesto"].isin(["OPERADOR SENCILLO", "OPERADOR REGIO"])
+    )
+    act_sencillo = df_operadores[cond_sencillo_regio]["Numero"].nunique()
+  else:
+    act_sencillo = 0
+
+  if not df_unidades_copy.empty:
     cond_unidades_sencillo = (
         (df_unidades_copy["Estatus"] == "ACTIVA")
         & (df_unidades_copy["TipoUnidad"] == "TRACTOCAMION")
@@ -308,7 +312,7 @@ if pagina == "Dashboard":
   else:
     act_full = 0
 
-  if not df_unidades.empty:
+  if not df_unidades_copy.empty:
     cond_unidades_full = (
         (df_unidades_copy["Estatus"] == "ACTIVA")
         & (df_unidades_copy["TipoUnidad"] == "TRACTOCAMION")
@@ -322,12 +326,34 @@ if pagina == "Dashboard":
       f"{(act_full / unidades_full) * 100:.0f}%" if unidades_full > 0 else "0%"
   )
 
+  # 3. OPERADOR PATIO
+  if not df_operadores.empty:
+    cond_patio = (df_operadores["FechaBaja"].isna()) & (
+        df_operadores["Puesto"] == "OPERADOR PATIO"
+    )
+    act_patio = df_operadores[cond_patio]["Numero"].nunique()
+  else:
+    act_patio = 0
+
+  if not df_unidades_copy.empty:
+    cond_unidades_patio = (
+        (df_unidades_copy["Estatus"] == "ACTIVA")
+        & (df_unidades_copy["TipoUnidad"] == "TRACTOCAMION")
+        & (df_unidades_copy["GrupoUnidad"] == "PATIERO")
+    )
+    unidades_patio = len(df_unidades_copy[cond_unidades_patio])
+  else:
+    unidades_patio = 0
+
+  cump_patio_str = (
+      f"{(act_patio / unidades_patio) * 100:.0f}%" if unidades_patio > 0 else "0%"
+  )
+
   # OTROS PUESTOS
   conteo_puestos = {}
   if not df_operadores.empty and "Puesto" in df_operadores.columns:
     conteo_puestos = df_operadores["Puesto"].value_counts().to_dict()
 
-  patio_cnt = conteo_puestos.get("OPERADOR PATIO", 0)
   postura_cnt = conteo_puestos.get("OPERADOR POSTURA", 0)
   incapacitado_cnt = conteo_puestos.get("OPERADOR INCAPACITADO", 0)
 
@@ -443,9 +469,9 @@ if pagina == "Dashboard":
                 <div class="kpi-icon-badge">🏗️</div>
                 <div>
                     <div class="kpi-title">Operador Patio</div>
-                    <div class="kpi-value" style="color: #1D4ED8;">{patio_cnt}</div>
+                    <div class="kpi-value" style="color: #1D4ED8;">{act_patio}</div>
                 </div>
-                <div class="kpi-sub">Operadores activos</div>
+                <div class="kpi-sub">Unidades: <b>{unidades_patio}</b> | <span style="color: #059669; font-weight: 800;">{cump_patio_str}</span></div>
             </div>
         """,
         unsafe_allow_html=True,
