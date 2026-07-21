@@ -20,7 +20,6 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* Estilos Generales y Sidebar */
     [data-testid="stSidebar"] { background-color: #121929 !important; padding-top: 1rem; }
     [data-testid="stSidebarNav"] { display: none; }
     .sidebar-header { display: flex; align-items: center; gap: 12px; padding: 10px 8px 15px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 15px; }
@@ -32,7 +31,6 @@ st.markdown(
     div[data-testid="stSidebar"] div.stButton > button:hover { background-color: #1A243B; color: #FFFFFF; }
     .last-update-badge { background-color: #1E293B; color: #38BDF8; border: 1px solid #0284C7; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 20px; display: inline-block; }
 
-    /* ESTILO MODERNO PARA TARJETAS KPI CON EFECTO HOVER */
     .kpi-card {
         background: linear-gradient(135deg, #EFF6FF 0%, #E0F2FE 100%);
         border-radius: 18px;
@@ -182,15 +180,10 @@ if pagina == "Dashboard":
 
   st.divider()
 
-  # Carga de datos de Azure SQL
   df_operadores = cargar_datos_sql("SELECT * FROM Operadores")
   df_unidades = cargar_datos_sql("SELECT * FROM Unidades")
 
-  # ---------------------------------------------------------
-  # CÁLCULOS MEDIDAS DAX EN PYTHON
-  # ---------------------------------------------------------
-
-  # 1. Unidades Activas
+  # --- CÁLCULOS FILA 1 ---
   if not df_unidades.empty:
     unidades_activas = (
         len(df_unidades[df_unidades["Estatus"] == "ACTIVA"])
@@ -200,12 +193,10 @@ if pagina == "Dashboard":
   else:
     unidades_activas = 0
 
-  # 2. Plantilla Autorizada = [Unidades Activas] * 1.1
   plantilla_autorizada = int(round(unidades_activas * 1.1))
   if plantilla_autorizada == 0:
     plantilla_autorizada = 134
 
-  # 3. Operadores Activos sin NA
   if not df_operadores.empty:
     condicion_activos = df_operadores["FechaBaja"].isna() & (
         df_operadores["Puesto"] != "NA"
@@ -215,24 +206,17 @@ if pagina == "Dashboard":
   else:
     plantilla_real = 0
 
-  # 4. Operadores vs Plantilla Autorizada (%)
   cumplimiento_str = (
       f"{(plantilla_real / plantilla_autorizada) * 100:.2f}%"
       if plantilla_autorizada > 0
       else "0.00%"
   )
 
-  # ---------------------------------------------------------
-  # CÁLCULO DE TASA DE CONTRATACIÓN (MES ACT. VS MES ANT.)
-  # ---------------------------------------------------------
   hoy = datetime.date.today()
-
-  # Mes Actual
   inicio_mes_act = datetime.date(hoy.year, hoy.month, 1)
   dias_mes_act = calendar.monthrange(hoy.year, hoy.month)[1]
   fin_mes_act = datetime.date(hoy.year, hoy.month, dias_mes_act)
 
-  # Mes Anterior
   primer_dia_mes_act = datetime.date(hoy.year, hoy.month, 1)
   fin_mes_ant = primer_dia_mes_act - datetime.timedelta(days=1)
   inicio_mes_ant = datetime.date(fin_mes_ant.year, fin_mes_ant.month, 1)
@@ -248,12 +232,10 @@ if pagina == "Dashboard":
         df_operadores["FechaBaja"], errors="coerce"
     ).dt.date
 
-    # Mes Actual
     altas_act = df_operadores[
         (df_operadores["FechaContratacion"] >= inicio_mes_act)
         & (df_operadores["FechaContratacion"] <= fin_mes_act)
     ]["Numero"].nunique()
-
     bajas_act = df_operadores[
         (df_operadores["FechaBaja"] >= inicio_mes_act)
         & (df_operadores["FechaBaja"] <= fin_mes_act)
@@ -263,12 +245,10 @@ if pagina == "Dashboard":
       tasa_act = altas_act / bajas_act
       tasa_mes_act_str = f"{tasa_act * 100:.2f}%"
 
-    # Mes Anterior
     altas_ant = df_operadores[
         (df_operadores["FechaContratacion"] >= inicio_mes_ant)
         & (df_operadores["FechaContratacion"] <= fin_mes_ant)
     ]["Numero"].nunique()
-
     bajas_ant = df_operadores[
         (df_operadores["FechaBaja"] >= inicio_mes_ant)
         & (df_operadores["FechaBaja"] <= fin_mes_ant)
@@ -278,21 +258,56 @@ if pagina == "Dashboard":
       tasa_ant = altas_ant / bajas_ant
       tasa_mes_ant_str = f"{tasa_ant * 100:.2f}%"
 
-  # Conteo por puestos para la fila 2
+  # --- CÁLCULOS FILA 2 (SENCILLO + REGIO) ---
+  if not df_operadores.empty:
+    cond_sencillo_regio = (
+        df_operadores["FechaBaja"].isna()
+        & df_operadores["Puesto"].isin(["OPERADOR SENCILLO", "OPERADOR REGIO"])
+    )
+    act_sencillo = df_operadores[cond_sencillo_regio]["Numero"].nunique()
+  else:
+    act_sencillo = 0
+
+  if not df_unidades.empty:
+    df_unidades_copy = df_unidades.copy()
+    if "Estatus" in df_unidades_copy.columns:
+      df_unidades_copy["Estatus"] = (
+          df_unidades_copy["Estatus"].astype(str).str.upper()
+      )
+    if "TipoUnidad" in df_unidades_copy.columns:
+      df_unidades_copy["TipoUnidad"] = (
+          df_unidades_copy["TipoUnidad"].astype(str).str.upper()
+      )
+    if "GrupoUnidad" in df_unidades_copy.columns:
+      df_unidades_copy["GrupoUnidad"] = (
+          df_unidades_copy["GrupoUnidad"].astype(str).str.upper()
+      )
+
+    cond_unidades_sencillo = (
+        (df_unidades_copy["Estatus"] == "ACTIVA")
+        & (df_unidades_copy["TipoUnidad"] == "TRACTOCAMION")
+        & (df_unidades_copy["GrupoUnidad"].isin(["GENERAL", "REGIONAL"]))
+    )
+    unidades_sencillo = len(df_unidades_copy[cond_unidades_sencillo])
+  else:
+    unidades_sencillo = 0
+
+  if unidades_sencillo > 0:
+    cump_sencillo_str = f"{(act_sencillo / unidades_sencillo) * 100:.0f}%"
+  else:
+    cump_sencillo_str = "0%"
+
   conteo_puestos = {}
   if not df_operadores.empty and "Puesto" in df_operadores.columns:
     conteo_puestos = df_operadores["Puesto"].value_counts().to_dict()
 
-  sencillo_cnt = conteo_puestos.get("OPERADOR SENCILLO", 0) + conteo_puestos.get(
-      "OPERADOR REGIO", 0
-  )
   full_cnt = conteo_puestos.get("OPERADOR FULL", 0)
   patio_cnt = conteo_puestos.get("OPERADOR PATIO", 0)
   postura_cnt = conteo_puestos.get("OPERADOR POSTURA", 0)
   incapacitado_cnt = conteo_puestos.get("OPERADOR INCAPACITADO", 0)
 
   # ---------------------------------------------------------
-  # FILA 1: TARJETAS PRINCIPALES (4 COLUMNAS UNIFORMES)
+  # FILA 1: TARJETAS PRINCIPALES
   # ---------------------------------------------------------
   col1, col2, col3, col4 = st.columns(4)
 
@@ -373,9 +388,9 @@ if pagina == "Dashboard":
                 <div class="kpi-icon-badge">🚛</div>
                 <div>
                     <div class="kpi-title">Sencillo + Regio</div>
-                    <div class="kpi-value" style="color: #1D4ED8;">{sencillo_cnt}</div>
+                    <div class="kpi-value" style="color: #1D4ED8;">{act_sencillo}</div>
                 </div>
-                <div class="kpi-sub">Operadores activos</div>
+                <div class="kpi-sub">Act: <b>{act_sencillo}</b> | Unidades: <b>{unidades_sencillo}</b> | <span style="color: #059669; font-weight: 800;">{cump_sencillo_str}</span></div>
             </div>
         """,
         unsafe_allow_html=True,
@@ -443,6 +458,5 @@ if pagina == "Dashboard":
 
   st.divider()
 
-  # Vista previa de datos cargados de SQL
   st.markdown("##### 🔍 Vista Previa de Tabla 'Operadores' desde Azure")
   st.dataframe(df_operadores.head(10), use_container_width=True)
