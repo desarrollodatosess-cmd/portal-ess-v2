@@ -1037,6 +1037,61 @@ if pagina == "Dashboard":
       pct_cump = 1 - (op_doping_vencido / total_operadores_activos)
       pct_antidoping_str = f"{pct_cump * 100:.2f}%"
 
+  # ---------------------------------------------------------
+  # MOTIVOS DE BAJA (B01-B05, últimos 3 meses)
+  # ---------------------------------------------------------
+  def edate(d, meses):
+    """Equivalente a EDATE de DAX: suma/resta meses a una fecha."""
+    total_meses = d.month - 1 + meses
+    anio = d.year + total_meses // 12
+    mes = total_meses % 12 + 1
+    dia = min(d.day, calendar.monthrange(anio, mes)[1])
+    return datetime.date(anio, mes, dia)
+
+  bajas_b01 = bajas_b02 = bajas_b03 = bajas_b04 = bajas_b05 = 0
+
+  if not df_operadores.empty and "Observaciones" in df_operadores.columns:
+    fecha_base = datetime.date.today()
+    inicio_mes_actual_mb = datetime.date(fecha_base.year, fecha_base.month, 1)
+    fin_mes_actual_mb = datetime.date(
+        fecha_base.year,
+        fecha_base.month,
+        calendar.monthrange(fecha_base.year, fecha_base.month)[1],
+    )
+    inicio_rango_mb = edate(inicio_mes_actual_mb, -2)
+    fin_rango_mb = fin_mes_actual_mb
+
+    obs_upper = df_operadores["Observaciones"].fillna("").astype(str).str.upper()
+
+    cond_rango_baja = (
+        df_operadores["FechaBaja"].notna()
+        & (df_operadores["FechaBaja"] >= inicio_rango_mb)
+        & (df_operadores["FechaBaja"] <= fin_rango_mb)
+    )
+
+    bajas_b01 = df_operadores[
+        cond_rango_baja & obs_upper.str.contains("B01")
+    ]["Numero"].nunique()
+
+    bajas_b02 = df_operadores[
+        cond_rango_baja & obs_upper.str.contains("B02")
+    ]["Numero"].nunique()
+
+    bajas_b03 = df_operadores[
+        cond_rango_baja & obs_upper.str.contains("B03")
+    ]["Numero"].nunique()
+
+    bajas_b04 = df_operadores[
+        cond_rango_baja
+        & obs_upper.str.contains("B04")
+        & ~obs_upper.str.contains("B041")
+        & ~obs_upper.str.contains("B042")
+    ]["Numero"].nunique()
+
+    bajas_b05 = df_operadores[
+        cond_rango_baja & obs_upper.str.contains("B05")
+    ]["Numero"].nunique()
+
   # --- PRESENTACIÓN EN PANTALLA: ACTIVAS vs BAJAS ---
   col_sec_activas, col_sec_bajas = st.columns(2)
 
@@ -1200,6 +1255,45 @@ if pagina == "Dashboard":
                     <div class="indicator-item">
                         <div class="indicator-label">% Cump. Antidoping</div>
                         <div class="indicator-value" style="color: #047857;">{pct_antidoping_str}</div>
+                    </div>
+                </div>
+            </div>
+        """,
+      unsafe_allow_html=True,
+  )
+
+  st.write("")
+  st.write("")
+
+  # ---------------------------------------------------------
+  # TARJETA: MOTIVOS DE BAJA
+  # ---------------------------------------------------------
+  st.markdown("##### 📋 Motivos de Baja")
+
+  st.markdown(
+      f"""
+            <div class="indicator-card">
+                <div class="indicator-header">Motivos de Baja</div>
+                <div class="indicator-grid">
+                    <div class="indicator-item">
+                        <div class="indicator-label">B01 Doping</div>
+                        <div class="indicator-value" style="color: #1D4ED8;">{bajas_b01}</div>
+                    </div>
+                    <div class="indicator-item">
+                        <div class="indicator-label">B02 Resición</div>
+                        <div class="indicator-value" style="color: #1D4ED8;">{bajas_b02}</div>
+                    </div>
+                    <div class="indicator-item">
+                        <div class="indicator-label">B03 Abandono</div>
+                        <div class="indicator-value" style="color: #1D4ED8;">{bajas_b03}</div>
+                    </div>
+                    <div class="indicator-item">
+                        <div class="indicator-label">B04 Baja Vol</div>
+                        <div class="indicator-value" style="color: #1D4ED8;">{bajas_b04}</div>
+                    </div>
+                    <div class="indicator-item">
+                        <div class="indicator-label">B05 Pensión</div>
+                        <div class="indicator-value" style="color: #1D4ED8;">{bajas_b05}</div>
                     </div>
                 </div>
             </div>
