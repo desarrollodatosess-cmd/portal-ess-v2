@@ -180,7 +180,6 @@ st.markdown(
     }
 
     .tenure-header {
-        background-color: #1E3A8A;
         color: #FFFFFF;
         font-weight: 800;
         font-size: 13px;
@@ -199,13 +198,11 @@ st.markdown(
     .tenure-count {
         font-size: 22px;
         font-weight: 800;
-        color: #334155;
     }
 
     .tenure-percentage {
         font-size: 20px;
         font-weight: 900;
-        color: #0F172A;
     }
 </style>
 """,
@@ -873,7 +870,7 @@ if pagina == "Dashboard":
   # --- PRESENTACIÓN EN PANTALLA: ACTIVAS vs BAJAS ---
   col_sec_activas, col_sec_bajas = st.columns(2)
 
-  # COLUMNA IZQUIERDA: PLANTILLA ACTIVA (2x2)
+  # COLUMNA IZQUIERDA: PLANTILLA ACTIVA (VERDE)
   with col_sec_activas:
     st.markdown("##### ⏳ Antigüedad de Plantilla Activa")
 
@@ -882,10 +879,10 @@ if pagina == "Dashboard":
       st.markdown(
           f"""
                 <div class="tenure-card">
-                    <div class="tenure-header" style="background-color: #1E3A8A;">0 - 3 Meses</div>
+                    <div class="tenure-header" style="background-color: #065F46;">0 - 3 Meses</div>
                     <div class="tenure-body">
-                        <span class="tenure-count">{cnt_0_3}</span>
-                        <span class="tenure-percentage">{pct_0_3}</span>
+                        <span class="tenure-count" style="color: #065F46;">{cnt_0_3}</span>
+                        <span class="tenure-percentage" style="color: #047857;">{pct_0_3}</span>
                     </div>
                 </div>
             """,
@@ -896,10 +893,10 @@ if pagina == "Dashboard":
       st.markdown(
           f"""
                 <div class="tenure-card">
-                    <div class="tenure-header" style="background-color: #1E3A8A;">4 - 6 Meses</div>
+                    <div class="tenure-header" style="background-color: #065F46;">4 - 6 Meses</div>
                     <div class="tenure-body">
-                        <span class="tenure-count">{cnt_4_6}</span>
-                        <span class="tenure-percentage">{pct_4_6}</span>
+                        <span class="tenure-count" style="color: #065F46;">{cnt_4_6}</span>
+                        <span class="tenure-percentage" style="color: #047857;">{pct_4_6}</span>
                     </div>
                 </div>
             """,
@@ -913,10 +910,10 @@ if pagina == "Dashboard":
       st.markdown(
           f"""
                 <div class="tenure-card">
-                    <div class="tenure-header" style="background-color: #1E3A8A;">7 - 12 Meses</div>
+                    <div class="tenure-header" style="background-color: #065F46;">7 - 12 Meses</div>
                     <div class="tenure-body">
-                        <span class="tenure-count">{cnt_7_12}</span>
-                        <span class="tenure-percentage">{pct_7_12}</span>
+                        <span class="tenure-count" style="color: #065F46;">{cnt_7_12}</span>
+                        <span class="tenure-percentage" style="color: #047857;">{pct_7_12}</span>
                     </div>
                 </div>
             """,
@@ -927,17 +924,17 @@ if pagina == "Dashboard":
       st.markdown(
           f"""
                 <div class="tenure-card">
-                    <div class="tenure-header" style="background-color: #1E3A8A;">+1 Año</div>
+                    <div class="tenure-header" style="background-color: #065F46;">+1 Año</div>
                     <div class="tenure-body">
-                        <span class="tenure-count">{cnt_1mas}</span>
-                        <span class="tenure-percentage">{pct_1mas}</span>
+                        <span class="tenure-count" style="color: #065F46;">{cnt_1mas}</span>
+                        <span class="tenure-percentage" style="color: #047857;">{pct_1mas}</span>
                     </div>
                 </div>
             """,
           unsafe_allow_html=True,
       )
 
-  # COLUMNA DERECHA: BAJAS (ÚLTIMOS 6 MESES) (2x2)
+  # COLUMNA DERECHA: BAJAS (ROJO)
   with col_sec_bajas:
     st.markdown("##### 📉 Antigüedad de Bajas (Últimos 6 Meses)")
 
@@ -1005,4 +1002,3 @@ if pagina == "Dashboard":
 
   st.markdown("##### 🔍 Vista Previa de Tabla 'Operadores' desde Azure")
   st.dataframe(df_operadores.head(10), use_container_width=True)
-     
