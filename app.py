@@ -204,6 +204,55 @@ st.markdown(
         font-size: 20px;
         font-weight: 900;
     }
+
+    /* Tarjeta de Indicadores Operador */
+    .indicator-card {
+        background: #FFFFFF;
+        border-radius: 16px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+        margin-top: 8px;
+    }
+
+    .indicator-header {
+        background: linear-gradient(90deg, #1E293B 0%, #334155 100%);
+        color: #FFFFFF;
+        font-weight: 800;
+        font-size: 13px;
+        padding: 10px 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        text-align: center;
+    }
+
+    .indicator-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        padding: 16px 8px;
+        text-align: center;
+    }
+
+    .indicator-item {
+        border-right: 1px solid #F1F5F9;
+        padding: 0 8px;
+    }
+
+    .indicator-item:last-child { border-right: none; }
+
+    .indicator-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748B;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .indicator-value {
+        font-size: 22px;
+        font-weight: 900;
+        line-height: 1;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -867,6 +916,94 @@ if pagina == "Dashboard":
       cnt_baja_1mas = df_bajas_6m[cond_b_1mas]["Numero"].nunique()
       pct_baja_1mas = f"{(cnt_baja_1mas / total_bajas_6m) * 100:.2f}%"
 
+  # ---------------------------------------------------------
+  # INDICADORES OPERADOR (Licencias / Antidoping)
+  # ---------------------------------------------------------
+  lic_venc = 0
+  lic_por_vencer = 0
+  op_doping_vencido = 0
+  op_doping_por_vencer = 0
+  pct_antidoping_str = "--"
+
+  if not df_operadores.empty:
+    hoy_ind = datetime.date.today()
+
+    # Base: activos, sin NA, sin incapacitados
+    cond_activos_sin_na = (
+        df_operadores["FechaBaja"].isna()
+        & (df_operadores["Puesto"] != "NA")
+        & (df_operadores["Puesto"] != "OPERADOR INCAPACITADO")
+    )
+
+    # --- Licencias ---
+    if "LicenciaVencimiento" in df_operadores.columns:
+      df_operadores["LicenciaVencimiento"] = pd.to_datetime(
+          df_operadores["LicenciaVencimiento"], errors="coerce"
+      ).dt.date
+
+      cond_lic_venc = (
+          df_operadores["LicenciaVencimiento"].notna()
+          & (df_operadores["LicenciaVencimiento"] < hoy_ind)
+          & cond_activos_sin_na
+      )
+      lic_venc = df_operadores[cond_lic_venc]["Numero"].nunique()
+
+      cond_lic_por_vencer = (
+          df_operadores["FechaBaja"].isna()
+          & df_operadores["LicenciaVencimiento"].notna()
+          & (df_operadores["LicenciaVencimiento"] >= hoy_ind)
+          & (
+              df_operadores["LicenciaVencimiento"]
+              <= hoy_ind + datetime.timedelta(days=90)
+          )
+          & (df_operadores["Puesto"] != "OPERADOR INCAPACITADO")
+      )
+      lic_por_vencer = df_operadores[cond_lic_por_vencer]["Numero"].nunique()
+
+    # --- Antidoping ---
+    # AJUSTA "FechaVencimientoAntidoping" al nombre real de tu columna en Azure SQL
+    if "FechaVencimientoAntidoping" in df_operadores.columns:
+      df_operadores["FechaVencimientoAntidoping"] = pd.to_datetime(
+          df_operadores["FechaVencimientoAntidoping"], errors="coerce"
+      ).dt.date
+      df_operadores["DiasAntidoping"] = df_operadores[
+          "FechaVencimientoAntidoping"
+      ].apply(lambda f: (hoy_ind - f).days if pd.notna(f) else None)
+
+      cond_doping_vencido = (
+          df_operadores["DiasAntidoping"].notna()
+          & (df_operadores["DiasAntidoping"] > 0)
+          & cond_activos_sin_na
+      )
+      op_doping_vencido = df_operadores[cond_doping_vencido]["Numero"].nunique()
+
+      cond_doping_por_vencer = (
+          df_operadores["DiasAntidoping"].notna()
+          & (df_operadores["DiasAntidoping"] <= 0)
+          & (df_operadores["DiasAntidoping"] >= -30)
+          & cond_activos_sin_na
+      )
+      op_doping_por_vencer = df_operadores[cond_doping_por_vencer][
+          "Numero"
+      ].nunique()
+
+    # --- % Cumplimiento Antidoping ---
+    puestos_operativos = [
+        "OPERADOR FULL",
+        "OPERADOR PATIO",
+        "OPERADOR POSTURA",
+        "OPERADOR SENCILLO",
+    ]
+    cond_total_ops = (
+        df_operadores["FechaBaja"].isna()
+        & df_operadores["Puesto"].isin(puestos_operativos)
+    )
+    total_operadores_activos = df_operadores[cond_total_ops]["Numero"].nunique()
+
+    if total_operadores_activos > 0:
+      pct_cump = 1 - (op_doping_vencido / total_operadores_activos)
+      pct_antidoping_str = f"{pct_cump * 100:.2f}%"
+
   # --- PRESENTACIÓN EN PANTALLA: ACTIVAS vs BAJAS ---
   col_sec_activas, col_sec_bajas = st.columns(2)
 
@@ -997,6 +1134,45 @@ if pagina == "Dashboard":
             """,
           unsafe_allow_html=True,
       )
+
+  st.write("")
+  st.write("")
+
+  # ---------------------------------------------------------
+  # SECCIÓN: INDICADORES OPERADOR (debajo de Antigüedad)
+  # ---------------------------------------------------------
+  st.markdown("##### 🧾 Indicadores Operador")
+
+  st.markdown(
+      f"""
+            <div class="indicator-card">
+                <div class="indicator-header">Indicadores Operador</div>
+                <div class="indicator-grid">
+                    <div class="indicator-item">
+                        <div class="indicator-label">Licencias Venc.</div>
+                        <div class="indicator-value" style="color: #B91C1C;">{lic_venc}</div>
+                    </div>
+                    <div class="indicator-item">
+                        <div class="indicator-label">Lic. p/ Vencer &lt;90 Días</div>
+                        <div class="indicator-value" style="color: #D97706;">{lic_por_vencer}</div>
+                    </div>
+                    <div class="indicator-item">
+                        <div class="indicator-label">Op. Doping Vencido</div>
+                        <div class="indicator-value" style="color: #B91C1C;">{op_doping_vencido}</div>
+                    </div>
+                    <div class="indicator-item">
+                        <div class="indicator-label">Op. Doping &lt;30 Días</div>
+                        <div class="indicator-value" style="color: #D97706;">{op_doping_por_vencer}</div>
+                    </div>
+                    <div class="indicator-item">
+                        <div class="indicator-label">% Cump. Antidoping</div>
+                        <div class="indicator-value" style="color: #047857;">{pct_antidoping_str}</div>
+                    </div>
+                </div>
+            </div>
+        """,
+      unsafe_allow_html=True,
+  )
 
   st.divider()
 
