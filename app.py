@@ -343,6 +343,7 @@ if pagina == "Dashboard":
 
   df_operadores = cargar_datos_sql("SELECT * FROM Operadores")
   df_unidades = cargar_datos_sql("SELECT * FROM Unidades")
+  df_operadores_documentos = cargar_datos_sql("SELECT * FROM OperadoresDocumentos")
 
   # --- CÁLCULOS FILA 1 ---
   if not df_unidades.empty:
@@ -961,31 +962,63 @@ if pagina == "Dashboard":
       lic_por_vencer = df_operadores[cond_lic_por_vencer]["Numero"].nunique()
 
     # --- Antidoping ---
-    # AJUSTA "FechaVencimientoAntidoping" al nombre real de tu columna en Azure SQL
-    if "FechaVencimientoAntidoping" in df_operadores.columns:
-      df_operadores["FechaVencimientoAntidoping"] = pd.to_datetime(
-          df_operadores["FechaVencimientoAntidoping"], errors="coerce"
+    # Traducción de la medida DAX "Dias Antidoping": para cada operador se toma
+    # el registro MÁS RECIENTE (por UltimaActualizacion) de OperadoresDocumentos
+    # cuyo DescripcionDocumento = "ANTIDOPING", y se usa su FechaVencimiento.
+    fecha_venc_antidoping = pd.Series(dtype="object")
+
+    if (
+        not df_operadores_documentos.empty
+        and "DescripcionDocumento" in df_operadores_documentos.columns
+    ):
+      df_docs = df_operadores_documentos.copy()
+      df_docs["UltimaActualizacion"] = pd.to_datetime(
+          df_docs["UltimaActualizacion"], errors="coerce"
+      )
+      df_docs["FechaVencimiento"] = pd.to_datetime(
+          df_docs["FechaVencimiento"], errors="coerce"
       ).dt.date
-      df_operadores["DiasAntidoping"] = df_operadores[
-          "FechaVencimientoAntidoping"
-      ].apply(lambda f: (hoy_ind - f).days if pd.notna(f) else None)
 
-      cond_doping_vencido = (
-          df_operadores["DiasAntidoping"].notna()
-          & (df_operadores["DiasAntidoping"] > 0)
-          & cond_activos_sin_na
-      )
-      op_doping_vencido = df_operadores[cond_doping_vencido]["Numero"].nunique()
+      cond_antidoping = (
+          df_docs["DescripcionDocumento"].astype(str).str.upper()
+          == "ANTIDOPING"
+      ) & df_docs["FechaVencimiento"].notna()
 
-      cond_doping_por_vencer = (
-          df_operadores["DiasAntidoping"].notna()
-          & (df_operadores["DiasAntidoping"] <= 0)
-          & (df_operadores["DiasAntidoping"] >= -30)
-          & cond_activos_sin_na
+      df_antidoping = df_docs[cond_antidoping].sort_values(
+          "UltimaActualizacion", ascending=False
       )
-      op_doping_por_vencer = df_operadores[cond_doping_por_vencer][
-          "Numero"
-      ].nunique()
+      # Nos quedamos con el registro más reciente por operador (TOPN 1 del DAX)
+      df_antidoping_latest = df_antidoping.drop_duplicates(
+          subset="Numero", keep="first"
+      )
+      fecha_venc_antidoping = df_antidoping_latest.set_index("Numero")[
+          "FechaVencimiento"
+      ]
+
+    df_operadores["FechaVencimientoAntidoping"] = df_operadores["Numero"].map(
+        fecha_venc_antidoping
+    )
+    # Dias Antidoping (DAX) = DATEDIFF(FechaVencimiento, Hoy, DAY) = Hoy - FechaVencimiento
+    df_operadores["DiasAntidoping"] = df_operadores[
+        "FechaVencimientoAntidoping"
+    ].apply(lambda f: (hoy_ind - f).days if pd.notna(f) else None)
+
+    cond_doping_vencido = (
+        df_operadores["DiasAntidoping"].notna()
+        & (df_operadores["DiasAntidoping"] > 0)
+        & cond_activos_sin_na
+    )
+    op_doping_vencido = df_operadores[cond_doping_vencido]["Numero"].nunique()
+
+    cond_doping_por_vencer = (
+        df_operadores["DiasAntidoping"].notna()
+        & (df_operadores["DiasAntidoping"] <= 0)
+        & (df_operadores["DiasAntidoping"] >= -30)
+        & cond_activos_sin_na
+    )
+    op_doping_por_vencer = df_operadores[cond_doping_por_vencer][
+        "Numero"
+    ].nunique()
 
     # --- % Cumplimiento Antidoping ---
     puestos_operativos = [
