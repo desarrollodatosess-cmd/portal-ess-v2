@@ -169,7 +169,7 @@ st.markdown(
         line-height: 1;
     }
 
-    /* Tarjetas de Antigüedad */
+    /* Tarjetas de Antigüedad Base */
     .tenure-card {
         background: #F8FAFC;
         border-radius: 12px;
@@ -746,26 +746,31 @@ if pagina == "Dashboard":
   st.write("")
 
   # ---------------------------------------------------------
-  # FILA 4: CÁLCULOS Y TARJETAS DE ANTIGÜEDAD (FORMATO 2x2)
+  # FILA 4 & 5: CÁLCULOS Y SECCIONES DE ANTIGÜEDAD (ACTIVAS vs BAJAS)
   # ---------------------------------------------------------
-  st.markdown("##### ⏳ Antigüedad de Plantilla Activa")
 
-  # Inicialización de métricas
+  # --- CÁLCULOS ACTIVAS ---
   cnt_0_3, pct_0_3 = 0, "0.00%"
   cnt_4_6, pct_4_6 = 0, "0.00%"
   cnt_7_12, pct_7_12 = 0, "0.00%"
   cnt_1mas, pct_1mas = 0, "0.00%"
 
+  # --- CÁLCULOS BAJAS (ÚLTIMOS 6 MESES) ---
+  cnt_baja_0_3, pct_baja_0_3 = 0, "0.00%"
+  cnt_baja_4_6, pct_baja_4_6 = 0, "0.00%"
+  cnt_baja_7_12, pct_baja_7_12 = 0, "0.00%"
+  cnt_baja_1mas, pct_baja_1mas = 0, "0.00%"
+
   if not df_operadores.empty:
     fecha_hoy = datetime.date.today()
 
-    # Base de plantilla activa (sin baja y puesto distinto de NA)
+    # 1. ANTIGÜEDAD ACTIVAS
     cond_plantilla = (
         df_operadores["FechaBaja"].isna() & (df_operadores["Puesto"] != "NA")
     )
     total_plantilla_activa = df_operadores[cond_plantilla]["Numero"].nunique()
 
-    # 1. 0 - 3 MESES (Hoy - 90 días)
+    # Activas 0 - 3 meses
     f_inc_0_3 = fecha_hoy - datetime.timedelta(days=90)
     cond_0_3 = (
         df_operadores["FechaBaja"].isna()
@@ -777,7 +782,7 @@ if pagina == "Dashboard":
     if total_plantilla_activa > 0:
       pct_0_3 = f"{(cnt_0_3 / total_plantilla_activa) * 100:.2f}%"
 
-    # 2. 4 - 6 MESES (Hoy - 91 días hasta Hoy - 180 días)
+    # Activas 4 - 6 meses
     f_max_4_6 = fecha_hoy - datetime.timedelta(days=91)
     f_min_4_6 = fecha_hoy - datetime.timedelta(days=180)
     cond_4_6 = (
@@ -790,7 +795,7 @@ if pagina == "Dashboard":
     if total_plantilla_activa > 0:
       pct_4_6 = f"{(cnt_4_6 / total_plantilla_activa) * 100:.2f}%"
 
-    # 3. 7 - 12 MESES (Hoy - 181 días hasta Hoy - 365 días)
+    # Activas 7 - 12 meses
     f_max_7_12 = fecha_hoy - datetime.timedelta(days=181)
     f_min_7_12 = fecha_hoy - datetime.timedelta(days=365)
     cond_7_12 = (
@@ -803,7 +808,7 @@ if pagina == "Dashboard":
     if total_plantilla_activa > 0:
       pct_7_12 = f"{(cnt_7_12 / total_plantilla_activa) * 100:.2f}%"
 
-    # 4. +1 AÑO (Hoy - 365 días, excluyendo números 1038, 1036, 1035)
+    # Activas +1 año
     f_corte_1mas = fecha_hoy - datetime.timedelta(days=365)
     excluir_nums = [1038, 1036, 1035]
     cond_1mas = (
@@ -816,71 +821,188 @@ if pagina == "Dashboard":
     if total_plantilla_activa > 0:
       pct_1mas = f"{(cnt_1mas / total_plantilla_activa) * 100:.2f}%"
 
-  # --- PRIMERA FILA DE TARJETAS (0-3 MESES | 4-6 MESES) ---
-  row1_col1, row1_col2 = st.columns(2)
+    # 2. ANTIGÜEDAD BAJAS (TRADUCCIÓN EXACTA FÓRMULAS DAX)
+    inicio_6m = fecha_hoy - datetime.timedelta(days=180)
 
-  with row1_col1:
-    st.markdown(
-        f"""
-            <div class="tenure-card">
-                <div class="tenure-header">0 - 3 Meses</div>
-                <div class="tenure-body">
-                    <span class="tenure-count">{cnt_0_3}</span>
-                    <span class="tenure-percentage">{pct_0_3}</span>
-                </div>
-            </div>
-        """,
-        unsafe_allow_html=True,
+    cond_bajas_ult6m = (
+        df_operadores["FechaBaja"].notna()
+        & (df_operadores["FechaBaja"] >= inicio_6m)
+        & (df_operadores["FechaBaja"] <= fecha_hoy)
     )
 
-  with row1_col2:
-    st.markdown(
-        f"""
-            <div class="tenure-card">
-                <div class="tenure-header">4 - 6 Meses</div>
-                <div class="tenure-body">
-                    <span class="tenure-count">{cnt_4_6}</span>
-                    <span class="tenure-percentage">{pct_4_6}</span>
+    df_bajas_6m = df_operadores[cond_bajas_ult6m].copy()
+    total_bajas_6m = df_bajas_6m["Numero"].nunique()
+
+    if total_bajas_6m > 0:
+
+      def diff_meses(row):
+        if pd.isna(row["FechaContratacion"]) or pd.isna(row["FechaBaja"]):
+          return -1
+        f_inc = row["FechaContratacion"]
+        f_fin = row["FechaBaja"]
+        return (f_fin.year - f_inc.year) * 12 + (f_fin.month - f_inc.month)
+
+      df_bajas_6m["MesesAntiguedad"] = df_bajas_6m.apply(diff_meses, axis=1)
+
+      # Bajas 0 - 3 Meses
+      cond_b_0_3 = (df_bajas_6m["MesesAntiguedad"] >= 0) & (
+          df_bajas_6m["MesesAntiguedad"] <= 3
+      )
+      cnt_baja_0_3 = df_bajas_6m[cond_b_0_3]["Numero"].nunique()
+      pct_baja_0_3 = f"{(cnt_baja_0_3 / total_bajas_6m) * 100:.2f}%"
+
+      # Bajas 4 - 6 Meses
+      cond_b_4_6 = (df_bajas_6m["MesesAntiguedad"] > 3) & (
+          df_bajas_6m["MesesAntiguedad"] <= 6
+      )
+      cnt_baja_4_6 = df_bajas_6m[cond_b_4_6]["Numero"].nunique()
+      pct_baja_4_6 = f"{(cnt_baja_4_6 / total_bajas_6m) * 100:.2f}%"
+
+      # Bajas 7 - 12 Meses
+      cond_b_7_12 = (df_bajas_6m["MesesAntiguedad"] > 6) & (
+          df_bajas_6m["MesesAntiguedad"] <= 12
+      )
+      cnt_baja_7_12 = df_bajas_6m[cond_b_7_12]["Numero"].nunique()
+      pct_baja_7_12 = f"{(cnt_baja_7_12 / total_bajas_6m) * 100:.2f}%"
+
+      # Bajas +12 Meses
+      cond_b_1mas = df_bajas_6m["MesesAntiguedad"] > 12
+      cnt_baja_1mas = df_bajas_6m[cond_b_1mas]["Numero"].nunique()
+      pct_baja_1mas = f"{(cnt_baja_1mas / total_bajas_6m) * 100:.2f}%"
+
+  # --- PRESENTACIÓN EN PANTALLA: ACTIVAS vs BAJAS ---
+  col_sec_activas, col_sec_bajas = st.columns(2)
+
+  # COLUMNA IZQUIERDA: PLANTILLA ACTIVA (2x2)
+  with col_sec_activas:
+    st.markdown("##### ⏳ Antigüedad de Plantilla Activa")
+
+    a_r1_c1, a_r1_c2 = st.columns(2)
+    with a_r1_c1:
+      st.markdown(
+          f"""
+                <div class="tenure-card">
+                    <div class="tenure-header" style="background-color: #1E3A8A;">0 - 3 Meses</div>
+                    <div class="tenure-body">
+                        <span class="tenure-count">{cnt_0_3}</span>
+                        <span class="tenure-percentage">{pct_0_3}</span>
+                    </div>
                 </div>
-            </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+          unsafe_allow_html=True,
+      )
 
-  st.write("")  # Espaciado vertical entre filas
-
-  # --- SEGUNDA FILA DE TARJETAS (7-12 MESES | +1 AÑO) ---
-  row2_col1, row2_col2 = st.columns(2)
-
-  with row2_col1:
-    st.markdown(
-        f"""
-            <div class="tenure-card">
-                <div class="tenure-header">7 - 12 Meses</div>
-                <div class="tenure-body">
-                    <span class="tenure-count">{cnt_7_12}</span>
-                    <span class="tenure-percentage">{pct_7_12}</span>
+    with a_r1_c2:
+      st.markdown(
+          f"""
+                <div class="tenure-card">
+                    <div class="tenure-header" style="background-color: #1E3A8A;">4 - 6 Meses</div>
+                    <div class="tenure-body">
+                        <span class="tenure-count">{cnt_4_6}</span>
+                        <span class="tenure-percentage">{pct_4_6}</span>
+                    </div>
                 </div>
-            </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+          unsafe_allow_html=True,
+      )
 
-  with row2_col2:
-    st.markdown(
-        f"""
-            <div class="tenure-card">
-                <div class="tenure-header">+1 Año</div>
-                <div class="tenure-body">
-                    <span class="tenure-count">{cnt_1mas}</span>
-                    <span class="tenure-percentage">{pct_1mas}</span>
+    st.write("")
+
+    a_r2_c1, a_r2_c2 = st.columns(2)
+    with a_r2_c1:
+      st.markdown(
+          f"""
+                <div class="tenure-card">
+                    <div class="tenure-header" style="background-color: #1E3A8A;">7 - 12 Meses</div>
+                    <div class="tenure-body">
+                        <span class="tenure-count">{cnt_7_12}</span>
+                        <span class="tenure-percentage">{pct_7_12}</span>
+                    </div>
                 </div>
-            </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+          unsafe_allow_html=True,
+      )
+
+    with a_r2_c2:
+      st.markdown(
+          f"""
+                <div class="tenure-card">
+                    <div class="tenure-header" style="background-color: #1E3A8A;">+1 Año</div>
+                    <div class="tenure-body">
+                        <span class="tenure-count">{cnt_1mas}</span>
+                        <span class="tenure-percentage">{pct_1mas}</span>
+                    </div>
+                </div>
+            """,
+          unsafe_allow_html=True,
+      )
+
+  # COLUMNA DERECHA: BAJAS (ÚLTIMOS 6 MESES) (2x2)
+  with col_sec_bajas:
+    st.markdown("##### 📉 Antigüedad de Bajas (Últimos 6 Meses)")
+
+    b_r1_c1, b_r1_c2 = st.columns(2)
+    with b_r1_c1:
+      st.markdown(
+          f"""
+                <div class="tenure-card">
+                    <div class="tenure-header" style="background-color: #991B1B;">0 - 3 Meses</div>
+                    <div class="tenure-body">
+                        <span class="tenure-count" style="color: #991B1B;">{cnt_baja_0_3}</span>
+                        <span class="tenure-percentage" style="color: #B91C1C;">{pct_baja_0_3}</span>
+                    </div>
+                </div>
+            """,
+          unsafe_allow_html=True,
+      )
+
+    with b_r1_c2:
+      st.markdown(
+          f"""
+                <div class="tenure-card">
+                    <div class="tenure-header" style="background-color: #991B1B;">4 - 6 Meses</div>
+                    <div class="tenure-body">
+                        <span class="tenure-count" style="color: #991B1B;">{cnt_baja_4_6}</span>
+                        <span class="tenure-percentage" style="color: #B91C1C;">{pct_baja_4_6}</span>
+                    </div>
+                </div>
+            """,
+          unsafe_allow_html=True,
+      )
+
+    st.write("")
+
+    b_r2_c1, b_r2_c2 = st.columns(2)
+    with b_r2_c1:
+      st.markdown(
+          f"""
+                <div class="tenure-card">
+                    <div class="tenure-header" style="background-color: #991B1B;">7 - 12 Meses</div>
+                    <div class="tenure-body">
+                        <span class="tenure-count" style="color: #991B1B;">{cnt_baja_7_12}</span>
+                        <span class="tenure-percentage" style="color: #B91C1C;">{pct_baja_7_12}</span>
+                    </div>
+                </div>
+            """,
+          unsafe_allow_html=True,
+      )
+
+    with b_r2_c2:
+      st.markdown(
+          f"""
+                <div class="tenure-card">
+                    <div class="tenure-header" style="background-color: #991B1B;">+1 Año</div>
+                    <div class="tenure-body">
+                        <span class="tenure-count" style="color: #991B1B;">{cnt_baja_1mas}</span>
+                        <span class="tenure-percentage" style="color: #B91C1C;">{pct_baja_1mas}</span>
+                    </div>
+                </div>
+            """,
+          unsafe_allow_html=True,
+      )
 
   st.divider()
 
   st.markdown("##### 🔍 Vista Previa de Tabla 'Operadores' desde Azure")
   st.dataframe(df_operadores.head(10), use_container_width=True)
+     
