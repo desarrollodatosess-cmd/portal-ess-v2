@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTILOS CSS
+# ESTILOS CSS REUTILIZABLES Y MEJORADOS
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -30,6 +30,7 @@ st.markdown(
     .menu-category { color: #52637A; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 18px; margin-bottom: 8px; padding-left: 10px; }
     div[data-testid="stSidebar"] div.stButton > button { width: 100%; background-color: transparent; color: #A0AEC0; border: none; text-align: left; padding: 10px 14px; border-radius: 8px; font-size: 14px; }
     div[data-testid="stSidebar"] div.stButton > button:hover { background-color: #1A243B; color: #FFFFFF; }
+    
     .last-update-badge { background-color: #1E293B; color: #38BDF8; border: 1px solid #0284C7; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 20px; display: inline-block; }
 
     /* Tarjetas KPI Principales */
@@ -46,7 +47,6 @@ st.markdown(
         position: relative;
         overflow: hidden;
     }
-
     .kpi-title { font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
     .kpi-value { font-size: 28px; font-weight: 900; line-height: 1.1; }
     .kpi-sub { font-size: 12px; font-weight: 600; color: #64748B; margin-top: 6px; }
@@ -82,17 +82,8 @@ st.markdown(
         padding: 0 10px;
     }
     .operator-item:last-child { border-right: none; }
-    .operator-label {
-        font-size: 12px;
-        font-weight: 700;
-        color: #475569;
-        margin-bottom: 8px;
-    }
-    .operator-value {
-        font-size: 28px;
-        font-weight: 900;
-        line-height: 1;
-    }
+    .operator-label { font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px; }
+    .operator-value { font-size: 28px; font-weight: 900; line-height: 1; }
 
     /* Histórico de Movimientos */
     .history-card { background: #FFFFFF; border-radius: 16px; border: 1px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow: hidden; margin-top: 8px; }
@@ -134,6 +125,41 @@ def cargar_datos_sql(query):
   except Exception as e:
     st.error(f"Error de lectura SQL: {e}")
     return pd.DataFrame()
+
+
+# ---------------------------------------------------------
+# HELPER DE MESES
+# ---------------------------------------------------------
+def obtener_ultimos_4_meses():
+  hoy = datetime.date.today()
+  meses = []
+  nombres_es = [
+      "Ene",
+      "Feb",
+      "Mar",
+      "Abr",
+      "May",
+      "Jun",
+      "Jul",
+      "Ago",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dic",
+  ]
+  m, y = hoy.month, hoy.year
+
+  for _ in range(4):
+    meses.append({
+        "year": y,
+        "month": m,
+        "label": f"{nombres_es[m - 1]} {str(y)[-2:]}",
+    })
+    m -= 1
+    if m == 0:
+      m = 12
+      y -= 1
+  return list(reversed(meses))
 
 
 # ---------------------------------------------------------
@@ -203,7 +229,7 @@ if pagina == "Dashboard":
   df_unidades = cargar_datos_sql("SELECT * FROM Unidades")
 
   # ---------------------------------------------------------
-  # CÁLCULOS DAX A PANDAS: INDICADORES OPERADOR
+  # 1. CÁLCULOS DAX A PANDAS: INDICADORES OPERADOR (REGLAS DE IMAGEN)
   # ---------------------------------------------------------
   lic_vencidas_cnt = 0
   lic_pvencer_cnt = 0
@@ -214,7 +240,6 @@ if pagina == "Dashboard":
   if not df_operadores.empty:
     hoy = datetime.date.today()
 
-    # Normalizar columnas
     df_operadores["Puesto_Norm"] = (
         df_operadores["Puesto"].fillna("").astype(str).str.strip().str.upper()
     )
@@ -225,13 +250,12 @@ if pagina == "Dashboard":
         df_operadores["LicenciaVencimiento"], errors="coerce"
     ).dt.date
 
-    # Condición general de activos válidos
     es_activo = df_operadores["FechaBaja_DT"].isna()
     puesto_valido = ~df_operadores["Puesto_Norm"].isin(
         ["NA", "OPERADOR INCAPACITADO", "INCAPACITADO"]
     )
 
-    # 1. Licencias Vencidas
+    # Licencias Vencidas
     cond_lic_venc = (
         es_activo
         & puesto_valido
@@ -240,7 +264,7 @@ if pagina == "Dashboard":
     )
     lic_vencidas_cnt = df_operadores[cond_lic_venc]["Numero"].nunique()
 
-    # 2. Licencias Por Vencer (<90 días)
+    # Licencias Por Vencer (<90 días)
     cond_lic_pvenc = (
         es_activo
         & (
@@ -254,7 +278,7 @@ if pagina == "Dashboard":
     )
     lic_pvencer_cnt = df_operadores[cond_lic_pvenc]["Numero"].nunique()
 
-    # 3. Antidoping Vencidos (Dias Antidoping > 0)
+    # Antidoping Vencidos (Dias Antidoping > 0)
     if "DiasAntidoping" in df_operadores.columns:
       cond_doping_venc = (
           es_activo
@@ -264,7 +288,7 @@ if pagina == "Dashboard":
       )
       doping_vencidos_cnt = df_operadores[cond_doping_venc]["Numero"].nunique()
 
-      # 4. Antidoping Por Vencer (<30 días: entre -30 y 0)
+      # Antidoping Por Vencer (<30 días: entre -30 y 0)
       cond_doping_pvenc = (
           es_activo
           & puesto_valido
@@ -274,7 +298,7 @@ if pagina == "Dashboard":
       )
       doping_pvencer_cnt = df_operadores[cond_doping_pvenc]["Numero"].nunique()
 
-    # 5. % Cumplimiento Antidoping
+    # % Cumplimiento Antidoping
     puestos_target = [
         "OPERADOR FULL",
         "OPERADOR PATIO",
@@ -293,9 +317,7 @@ if pagina == "Dashboard":
     else:
       pct_cumplimiento_antidoping = 0.0
 
-  # ---------------------------------------------------------
-  # LOGICA DE COLORES DINÁMICOS (BASADA EN REGLAS DE IMÁGENES)
-  # ---------------------------------------------------------
+  # Colores según Reglas de las Capturas
   color_lic_venc = "#DC2626" if lic_vencidas_cnt >= 1 else "#059669"
   color_lic_pvenc = "#D97706" if lic_pvencer_cnt >= 1 else "#059669"
   color_doping_venc = "#DC2626" if doping_vencidos_cnt >= 1 else "#059669"
@@ -304,9 +326,7 @@ if pagina == "Dashboard":
       "#059669" if pct_cumplimiento_antidoping >= 0.95 else "#DC2626"
   )
 
-  # ---------------------------------------------------------
-  # RENDER TARJETA "INDICADORES OPERADOR"
-  # ---------------------------------------------------------
+  # Render Tarjeta Indicadores Operador
   st.markdown(
       f"""
         <div class="operator-indicators-card">
@@ -339,33 +359,75 @@ if pagina == "Dashboard":
   )
 
   # ---------------------------------------------------------
-  # OTROS CÁLCULOS DEL DASHBOARD
+  # 2. CÁLCULOS KPI GENERALES (PLANTILLA / UNIDADES / ROTACIÓN)
   # ---------------------------------------------------------
-  if not df_unidades.empty:
-    unidades_activas = (
-        len(df_unidades[df_unidades["Estatus"] == "ACTIVA"])
-        if "Estatus" in df_unidades.columns
-        else len(df_unidades)
-    )
-  else:
-    unidades_activas = 0
-
-  plantilla_autorizada = int(round(unidades_activas * 1.1)) or 134
-  plantilla_real = (
-      df_operadores[
-          df_operadores["FechaBaja"].isna()
-          & (~df_operadores["Puesto"].isin(["NA", "OPERADOR INCAPACITADO"]))
-      ]["Numero"].nunique()
-      if not df_operadores.empty
-      else 0
+  unidades_activas = (
+      len(df_unidades[df_unidades["Estatus"] == "ACTIVA"])
+      if not df_unidades.empty and "Estatus" in df_unidades.columns
+      else len(df_unidades)
   )
+  plantilla_autorizada = int(round(unidades_activas * 1.1)) or 134
+
+  plantilla_real = 0
+  rotacion_mes_pct = 0.0
+  contratacion_mes_cnt = 0
+  contratacion_ant_cnt = 0
+
+  if not df_operadores.empty:
+    df_operadores["FechaIngreso_DT"] = pd.to_datetime(
+        df_operadores["FechaIngreso"], errors="coerce"
+    ).dt.date
+    hoy = datetime.date.today()
+
+    # Plantilla Real Activa
+    es_activo_valido = df_operadores["FechaBaja_DT"].isna() & (
+        ~df_operadores["Puesto_Norm"].isin(
+            ["NA", "OPERADOR INCAPACITADO", "INCAPACITADO"]
+        )
+    )
+    plantilla_real = df_operadores[es_activo_valido]["Numero"].nunique()
+
+    # Rotación Mes Actual
+    bajas_mes = df_operadores[
+        (df_operadores["FechaBaja_DT"].notna())
+        & (
+            pd.to_datetime(df_operadores["FechaBaja_DT"]).dt.month == hoy.month
+        )
+        & (pd.to_datetime(df_operadores["FechaBaja_DT"]).dt.year == hoy.year)
+    ]["Numero"].nunique()
+
+    if plantilla_real > 0:
+      rotacion_mes_pct = (bajas_mes / plantilla_real) * 100
+
+    # Tasa Contratación
+    contratacion_mes_cnt = df_operadores[
+        (df_operadores["FechaIngreso_DT"].notna())
+        & (
+            pd.to_datetime(df_operadores["FechaIngreso_DT"]).dt.month
+            == hoy.month
+        )
+        & (
+            pd.to_datetime(df_operadores["FechaIngreso_DT"]).dt.year
+            == hoy.year
+        )
+    ]["Numero"].nunique()
+
+    mes_ant = hoy.month - 1 if hoy.month > 1 else 12
+    anio_ant = hoy.year if hoy.month > 1 else hoy.year - 1
+    contratacion_ant_cnt = df_operadores[
+        (df_operadores["FechaIngreso_DT"].notna())
+        & (
+            pd.to_datetime(df_operadores["FechaIngreso_DT"]).dt.month == mes_ant
+        )
+        & (pd.to_datetime(df_operadores["FechaIngreso_DT"]).dt.year == anio_ant)
+    ]["Numero"].nunique()
+
   cumplimiento_str = (
       f"{(plantilla_real / plantilla_autorizada) * 100:.2f}%"
       if plantilla_autorizada > 0
       else "0.00%"
   )
 
-  # --- FILA 1: TARJETAS PRINCIPALES ---
   col1, col2, col3, col4 = st.columns(4)
   with col1:
     st.markdown(
@@ -379,20 +441,129 @@ if pagina == "Dashboard":
     )
   with col3:
     st.markdown(
-        """<div class="kpi-card"><div class="kpi-icon-badge">🔄</div><div><div class="kpi-title">Rotación</div><div class="kpi-value" style="color: #059669;">0.00%</div></div><div class="kpi-sub">Mes actual</div></div>""",
+        f"""<div class="kpi-card"><div class="kpi-icon-badge">🔄</div><div><div class="kpi-title">Rotación</div><div class="kpi-value" style="color: #059669;">{rotacion_mes_pct:.2f}%</div></div><div class="kpi-sub">Mes actual</div></div>""",
         unsafe_allow_html=True,
     )
   with col4:
     st.markdown(
-        """<div class="kpi-card"><div class="kpi-icon-badge">📈</div><div><div class="kpi-title">Tasa Contratación</div><div class="kpi-value" style="color: #1D4ED8;">--</div></div><div class="kpi-sub">Mes Ant: <b>--</b></div></div>""",
+        f"""<div class="kpi-card"><div class="kpi-icon-badge">📈</div><div><div class="kpi-title">Tasa Contratación</div><div class="kpi-value" style="color: #1D4ED8;">{contratacion_mes_cnt}</div></div><div class="kpi-sub">Mes Ant: <b>{contratacion_ant_cnt}</b></div></div>""",
         unsafe_allow_html=True,
     )
 
   st.write("")
 
   # ---------------------------------------------------------
-  # HISTÓRICO Y ANTIGÜEDAD (VERDE EN PLANTILLA ACTIVA)
+  # 3. HISTÓRICO DE MOVIMIENTOS (ALTAS / BAJAS DINÁMICAS DE 4 MESES)
   # ---------------------------------------------------------
+  ultimos_meses = obtener_ultimos_4_meses()
+  altas_data, bajas_data = [], []
+
+  if not df_operadores.empty:
+    for m in ultimos_meses:
+      c_altas = df_operadores[
+          (df_operadores["FechaIngreso_DT"].notna())
+          & (
+              pd.to_datetime(df_operadores["FechaIngreso_DT"]).dt.month
+              == m["month"]
+          )
+          & (
+              pd.to_datetime(df_operadores["FechaIngreso_DT"]).dt.year
+              == m["year"]
+          )
+      ]["Numero"].nunique()
+
+      c_bajas = df_operadores[
+          (df_operadores["FechaBaja_DT"].notna())
+          & (
+              pd.to_datetime(df_operadores["FechaBaja_DT"]).dt.month
+              == m["month"]
+          )
+          & (
+              pd.to_datetime(df_operadores["FechaBaja_DT"]).dt.year
+              == m["year"]
+          )
+      ]["Numero"].nunique()
+
+      altas_data.append((m["label"], c_altas))
+      bajas_data.append((m["label"], c_bajas))
+
+  col_hist_altas, col_hist_bajas = st.columns(2)
+
+  with col_hist_altas:
+    items_altas_html = "".join([
+        f'<div class="history-item"><div class="history-label">{label}</div><div class="history-value-altas">{val}</div></div>'
+        for label, val in altas_data
+    ])
+    st.markdown(
+        f"""<div class="history-card"><div class="card-header-altas">🌱 Histórico de Altas</div><div class="history-grid">{items_altas_html}</div></div>""",
+        unsafe_allow_html=True,
+    )
+
+  with col_hist_bajas:
+    items_bajas_html = "".join([
+        f'<div class="history-item"><div class="history-label">{label}</div><div class="history-value-bajas">{val}</div></div>'
+        for label, val in bajas_data
+    ])
+    st.markdown(
+        f"""<div class="history-card"><div class="card-header-bajas">🔻 Histórico de Bajas</div><div class="history-grid">{items_bajas_html}</div></div>""",
+        unsafe_allow_html=True,
+    )
+
+  st.write("")
+
+  # ---------------------------------------------------------
+  # 4. CÁLCULO DE ANTIGÜEDAD DINÁMICA (CON VERDE INSTITUCIONAL)
+  # ---------------------------------------------------------
+  ant_act_0_3, ant_act_0_3_pct = 0, 0.0
+  ant_act_4_6, ant_act_4_6_pct = 0, 0.0
+
+  ant_baj_0_3, ant_baj_0_3_pct = 0, 0.0
+  ant_baj_4_6, ant_baj_4_6_pct = 0, 0.0
+
+  if not df_operadores.empty:
+    hoy = datetime.date.today()
+
+    # Antigüedad Activos
+    df_activos = df_operadores[es_activo_valido].copy()
+    if not df_activos.empty:
+      total_activos = len(df_activos)
+      dias_activos = (
+          hoy - pd.to_datetime(df_activos["FechaIngreso_DT"]).dt.date
+      ).dt.days
+      ant_act_0_3 = (dias_activos <= 90).sum()
+      ant_act_4_6 = ((dias_activos > 90) & (dias_activos <= 180)).sum()
+
+      ant_act_0_3_pct = (
+          (ant_act_0_3 / total_activos) * 100 if total_activos > 0 else 0.0
+      )
+      ant_act_4_6_pct = (
+          (ant_act_4_6 / total_activos) * 100 if total_activos > 0 else 0.0
+      )
+
+    # Antigüedad Bajas (Últimos 6 Meses)
+    hace_6_meses = hoy - datetime.timedelta(days=180)
+    df_bajas_6m = df_operadores[
+        (df_operadores["FechaBaja_DT"].notna())
+        & (df_operadores["FechaBaja_DT"] >= hace_6_meses)
+    ].copy()
+
+    if not df_bajas_6m.empty:
+      total_bajas_6m = len(df_bajas_6m)
+      dias_trabajados = (
+          pd.to_datetime(df_bajas_6m["FechaBaja_DT"]).dt.date
+          - pd.to_datetime(df_bajas_6m["FechaIngreso_DT"]).dt.date
+      ).dt.days
+
+      ant_baj_0_3 = (dias_trabajados <= 90).sum()
+      ant_baj_4_6 = ((dias_trabajados > 90) & (dias_trabajados <= 180)).sum()
+
+      ant_baj_0_3_pct = (
+          (ant_baj_0_3 / total_bajas_6m) * 100 if total_bajas_6m > 0 else 0.0
+      )
+      ant_baj_4_6_pct = (
+          (ant_baj_4_6 / total_bajas_6m) * 100 if total_bajas_6m > 0 else 0.0
+      )
+
   col_sec_activas, col_sec_bajas = st.columns(2)
 
   with col_sec_activas:
@@ -400,12 +571,12 @@ if pagina == "Dashboard":
     a_r1_c1, a_r1_c2 = st.columns(2)
     with a_r1_c1:
       st.markdown(
-          """<div class="tenure-card"><div class="tenure-header" style="background-color: #065F46;">0 - 3 Meses</div><div class="tenure-body"><span class="tenure-count" style="color: #065F46;">0</span><span class="tenure-percentage" style="color: #047857;">0.00%</span></div></div>""",
+          f"""<div class="tenure-card"><div class="tenure-header" style="background-color: #065F46;">0 - 3 Meses</div><div class="tenure-body"><span class="tenure-count" style="color: #065F46;">{ant_act_0_3}</span><span class="tenure-percentage" style="color: #047857;">{ant_act_0_3_pct:.2f}%</span></div></div>""",
           unsafe_allow_html=True,
       )
     with a_r1_c2:
       st.markdown(
-          """<div class="tenure-card"><div class="tenure-header" style="background-color: #065F46;">4 - 6 Meses</div><div class="tenure-body"><span class="tenure-count" style="color: #065F46;">0</span><span class="tenure-percentage" style="color: #047857;">0.00%</span></div></div>""",
+          f"""<div class="tenure-card"><div class="tenure-header" style="background-color: #065F46;">4 - 6 Meses</div><div class="tenure-body"><span class="tenure-count" style="color: #065F46;">{ant_act_4_6}</span><span class="tenure-percentage" style="color: #047857;">{ant_act_4_6_pct:.2f}%</span></div></div>""",
           unsafe_allow_html=True,
       )
 
@@ -414,11 +585,22 @@ if pagina == "Dashboard":
     b_r1_c1, b_r1_c2 = st.columns(2)
     with b_r1_c1:
       st.markdown(
-          """<div class="tenure-card"><div class="tenure-header" style="background-color: #991B1B;">0 - 3 Meses</div><div class="tenure-body"><span class="tenure-count" style="color: #991B1B;">0</span><span class="tenure-percentage" style="color: #B91C1C;">0.00%</span></div></div>""",
+          f"""<div class="tenure-card"><div class="tenure-header" style="background-color: #991B1B;">0 - 3 Meses</div><div class="tenure-body"><span class="tenure-count" style="color: #991B1B;">{ant_baj_0_3}</span><span class="tenure-percentage" style="color: #B91C1C;">{ant_baj_0_3_pct:.2f}%</span></div></div>""",
           unsafe_allow_html=True,
       )
     with b_r1_c2:
       st.markdown(
-          """<div class="tenure-card"><div class="tenure-header" style="background-color: #991B1B;">4 - 6 Meses</div><div class="tenure-body"><span class="tenure-count" style="color: #991B1B;">0</span><span class="tenure-percentage" style="color: #B91C1C;">0.00%</span></div></div>""",
+          f"""<div class="tenure-card"><div class="tenure-header" style="background-color: #991B1B;">4 - 6 Meses</div><div class="tenure-body"><span class="tenure-count" style="color: #991B1B;">{ant_baj_4_6}</span><span class="tenure-percentage" style="color: #B91C1C;">{ant_baj_4_6_pct:.2f}%</span></div></div>""",
           unsafe_allow_html=True,
       )
+
+# ---------------------------------------------------------
+# VISTA: OPERADORES
+# ---------------------------------------------------------
+elif pagina == "Operadores":
+  st.markdown("## 🚚 Catálogo de Operadores")
+  df_ops = cargar_datos_sql("SELECT * FROM Operadores")
+  if not df_ops.empty:
+    st.dataframe(df_ops, use_container_width=True)
+  else:
+    st.warning("No hay datos disponibles en la tabla Operadores.")
