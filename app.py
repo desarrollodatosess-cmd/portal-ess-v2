@@ -313,6 +313,47 @@ with st.sidebar:
   if st.button("🚚  Operadores", key="btn_ops"):
     cambiar_pagina("Operadores")
 
+  st.markdown(
+      '<div class="menu-category">FILTROS</div>', unsafe_allow_html=True
+  )
+
+  _hoy_ref = datetime.date.today()
+  _anios_disponibles = list(range(_hoy_ref.year - 3, _hoy_ref.year + 1))
+  anio_sel = st.selectbox(
+      "Año",
+      options=_anios_disponibles,
+      index=len(_anios_disponibles) - 1,
+      key="filtro_anio",
+  )
+
+  _meses_nombres = [
+      "Actual",
+      "Enero",
+      "Febrero",
+      "Marzo",
+      "Abril",
+      "Mayo",
+      "Junio",
+      "Julio",
+      "Agosto",
+      "Septiembre",
+      "Octubre",
+      "Noviembre",
+      "Diciembre",
+  ]
+  mes_sel = st.selectbox(
+      "Mes", options=_meses_nombres, index=0, key="filtro_mes"
+  )
+
+  # fecha_base: mismo patrón que tu medida DAX de Motivos de Baja
+  # (si hay un periodo seleccionado se usa ese, si no, TODAY())
+  if mes_sel == "Actual":
+    fecha_base = datetime.date.today()
+  else:
+    _mes_num = _meses_nombres.index(mes_sel)  # Enero=1 ... Diciembre=12
+    _ultimo_dia = calendar.monthrange(anio_sel, _mes_num)[1]
+    fecha_base = datetime.date(anio_sel, _mes_num, _ultimo_dia)
+
 
 # ---------------------------------------------------------
 # VISTA PRINCIPAL: DASHBOARD
@@ -374,7 +415,7 @@ if pagina == "Dashboard":
       else "0.00%"
   )
 
-  hoy = datetime.date.today()
+  hoy = fecha_base
   inicio_mes_act = datetime.date(hoy.year, hoy.month, 1)
   dias_mes_act = calendar.monthrange(hoy.year, hoy.month)[1]
   fin_mes_act = datetime.date(hoy.year, hoy.month, dias_mes_act)
@@ -809,7 +850,7 @@ if pagina == "Dashboard":
   cnt_baja_1mas, pct_baja_1mas = 0, "0.00%"
 
   if not df_operadores.empty:
-    fecha_hoy = datetime.date.today()
+    fecha_hoy = fecha_base
 
     # 1. ANTIGÜEDAD ACTIVAS
     cond_plantilla = (
@@ -927,7 +968,7 @@ if pagina == "Dashboard":
   pct_antidoping_str = "--"
 
   if not df_operadores.empty:
-    hoy_ind = datetime.date.today()
+    hoy_ind = fecha_base
 
     # Base: activos, sin NA, sin incapacitados
     cond_activos_sin_na = (
@@ -1051,7 +1092,6 @@ if pagina == "Dashboard":
   bajas_b01 = bajas_b02 = bajas_b03 = bajas_b04 = bajas_b05 = 0
 
   if not df_operadores.empty and "Observaciones" in df_operadores.columns:
-    fecha_base = datetime.date.today()
     inicio_mes_actual_mb = datetime.date(fecha_base.year, fecha_base.month, 1)
     fin_mes_actual_mb = datetime.date(
         fecha_base.year,
