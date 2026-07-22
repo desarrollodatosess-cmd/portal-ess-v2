@@ -169,7 +169,7 @@ st.markdown(
         line-height: 1;
     }
 
-    /* Tarjetas de Antigüedad (Inspiradas en la imagen) */
+    /* Tarjetas de Antigüedad */
     .tenure-card {
         background: #F8FAFC;
         border-radius: 12px;
@@ -746,7 +746,7 @@ if pagina == "Dashboard":
   st.write("")
 
   # ---------------------------------------------------------
-  # FILA 4: CÁLCULOS Y TARJETAS DE ANTIGÜEDAD (TRADUCCIÓN DAX)
+  # FILA 4: CÁLCULOS Y TARJETAS DE ANTIGÜEDAD (FORMATO 2x2)
   # ---------------------------------------------------------
   st.markdown("##### ⏳ Antigüedad de Plantilla Activa")
 
@@ -816,10 +816,10 @@ if pagina == "Dashboard":
     if total_plantilla_activa > 0:
       pct_1mas = f"{(cnt_1mas / total_plantilla_activa) * 100:.2f}%"
 
-  # Renderizado de las 4 tarjetas de Antigüedad
-  t1, t2, t3, t4 = st.columns(4)
+  # --- PRIMERA FILA DE TARJETAS (0-3 MESES | 4-6 MESES) ---
+  row1_col1, row1_col2 = st.columns(2)
 
-  with t1:
+  with row1_col1:
     st.markdown(
         f"""
             <div class="tenure-card">
@@ -833,7 +833,7 @@ if pagina == "Dashboard":
         unsafe_allow_html=True,
     )
 
-  with t2:
+  with row1_col2:
     st.markdown(
         f"""
             <div class="tenure-card">
@@ -847,7 +847,12 @@ if pagina == "Dashboard":
         unsafe_allow_html=True,
     )
 
-  with t3:
+  st.write("")  # Espaciado vertical entre filas
+
+  # --- SEGUNDA FILA DE TARJETAS (7-12 MESES | +1 AÑO) ---
+  row2_col1, row2_col2 = st.columns(2)
+
+  with row2_col1:
     st.markdown(
         f"""
             <div class="tenure-card">
@@ -861,7 +866,7 @@ if pagina == "Dashboard":
         unsafe_allow_html=True,
     )
 
-  with t4:
+  with row2_col2:
     st.markdown(
         f"""
             <div class="tenure-card">
